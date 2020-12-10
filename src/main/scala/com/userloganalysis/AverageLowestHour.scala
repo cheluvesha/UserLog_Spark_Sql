@@ -7,10 +7,10 @@ class AverageLowestHour {
   lazy val logger: Logger = Logger.getLogger(getClass.getName)
   val sparkSession: SparkSession =
     UtilityClass.createSparkSessionObj("AverageLowestHours")
-  readDataFromMySqlForDataFrame()
+
   def readDataFromMySqlForDataFrame(): DataFrame = {
     logger.info("Read operation started to create dataframe from mysql")
-    val userlogDF = sparkSession.read
+    val userlogReadDF = sparkSession.read
       .format("jdbc")
       .option("url", "jdbc:mysql://localhost:3306/fellowship")
       .option("driver", "com.mysql.jdbc.Driver")
@@ -18,8 +18,11 @@ class AverageLowestHour {
       .option("user", "user")
       .option("password", "user00")
       .load()
-    userlogDF.show(10)
+    userlogReadDF.printSchema()
     logger.info("Read operation ended")
+    val userlogDF =
+      userlogReadDF.select("datetime", "username", "keyboard", "mouse")
+    userlogDF.show(false)
     userlogDF
   }
 }

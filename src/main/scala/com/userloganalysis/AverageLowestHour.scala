@@ -3,10 +3,9 @@ package com.userloganalysis
 import org.apache.log4j.Logger
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-class AverageLowestHour {
+class AverageLowestHour(sparkSession: SparkSession) {
+
   lazy val logger: Logger = Logger.getLogger(getClass.getName)
-  val sparkSession: SparkSession =
-    UtilityClass.createSparkSessionObj("AverageLowestHours")
 
   def readDataFromMySqlForDataFrame(): DataFrame = {
     logger.info("Read operation started to create dataframe from mysql")
@@ -24,5 +23,9 @@ class AverageLowestHour {
       userlogReadDF.select("datetime", "username", "keyboard", "mouse")
     userlogDF.show(false)
     userlogDF
+  }
+
+  def splitAndCreateUserlogDF(userDataFrame: DataFrame): Unit = {
+    val splitDF = userDataFrame.select()
   }
 }

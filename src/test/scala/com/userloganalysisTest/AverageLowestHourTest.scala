@@ -14,7 +14,7 @@ class AverageLowestHourTest extends FunSuite with BeforeAndAfterAll {
   override def beforeAll(): Unit = {
     sparkSession =
       UtilityClass.createSparkSessionObj("Average lowest hour Test App")
-    averageLowestHour = new AverageLowestHour
+    averageLowestHour = new AverageLowestHour(sparkSession)
 
   }
 

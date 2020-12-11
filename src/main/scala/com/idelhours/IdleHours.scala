@@ -34,4 +34,17 @@ class IdleHours(sparkSession: SparkSession) {
     }
   }
 
+  /***
+    * Creates View table to select keyboard and mouse column with condition
+    * @param userlogDF DataFrame
+    * @return DataFrame
+    */
+  def analyzeKeyboardAndMouseDataFromTable(userlogDF: DataFrame): DataFrame = {
+    userlogDF.createTempView("userlog_KMAnalyze")
+    val keyMouseAnalyzedDF = sparkSession.sql(
+      """select username,datetime,case when keyboard > 0.0 or mouse > 0.0 then 1 else 0 end as KM_analyzed from userlog_KMAnalyze"""
+    )
+    keyMouseAnalyzedDF
+  }
+  def groupConcatTheData(keyMouseAnalyzedDF: DataFrame) = ???
 }

@@ -1,7 +1,6 @@
 package com.userloganalysisTest
 
 import java.sql.Timestamp
-
 import com.userloganalysis.{AverageLowestHour, UtilityClass}
 import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -72,6 +71,7 @@ class AverageLowestHourTest extends FunSuite with BeforeAndAfterAll {
     assert(keyboard === 0.0)
     assert(mouse === 0.0)
     assert(name === "rahilstar11@gmail.com")
+
   }
   test(
     "givenDataFrameAsInputMustPerformSplitTimeAndDateShouldEqualToExceptedDataFrame"

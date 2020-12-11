@@ -7,6 +7,8 @@ import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
+import scala.collection.mutable
+
 class AverageLowestHourTest extends FunSuite with BeforeAndAfterAll {
   var spark: SparkSession = _
   var averageLowestHour: AverageLowestHour = _
@@ -15,8 +17,6 @@ class AverageLowestHourTest extends FunSuite with BeforeAndAfterAll {
     ("2019-05-21 15:05:02", "xyzname", 10.0, 41.00),
     ("2019-05-21 06:05:02", "testname", 30.0, 45.00)
   )
-  val csvFilePath = "./Data/CpuLogData2019-09-16.csv"
-  val wrongCSV = "./Data/testCSV.csv"
   val column = Seq("datetime", "username", "keyboard", "mouse")
   var splitTestDF: DataFrame = _
   var minMaxTestDF: DataFrame = _
@@ -29,7 +29,7 @@ class AverageLowestHourTest extends FunSuite with BeforeAndAfterAll {
     Seq("xyzname", "2019-05-21", "2019-05-21 06:05:02", "2019-05-21 15:05:02")
   val hourTestData = Seq("xyzname", "2019-05-21", 9.0)
   var dailyHourDF: DataFrame = _
-
+  var hourTestDF: DataFrame = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
     averageLowestHour = new AverageLowestHour(spark)
@@ -95,14 +95,22 @@ class AverageLowestHourTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("givenInputDFAsInputToCalculateDailyHourAndResultMustEqualToExpected") {
-    val hourTestDF = averageLowestHour.calculateDailyHour(dailyHourDF)
+    hourTestDF = averageLowestHour.calculateDailyHour(dailyHourDF)
     hourTestDF.take(1).foreach { rowData =>
       assert(rowData.get(0) === hourTestData.head)
       assert(rowData.get(1).toString === hourTestData(1))
       assert(rowData.get(2) === hourTestData.last)
     }
   }
-
+  test("givenInputDFAsInputToSumDailyHoursAndResultMustEqualToExcepted") {
+    val sumHourDF = averageLowestHour.sumDailyHourWRTUser(hourTestDF)
+    val userAndHourMap = new mutable.HashMap[String, String]()
+    sumHourDF.collect().foreach { user =>
+      userAndHourMap.put(user.get(0).toString, user.get(1).toString)
+    }
+    assert(userAndHourMap("xyzname") == "9.0")
+    assert(userAndHourMap("testname") == "0.0")
+  }
   override def afterAll(): Unit = {
     spark.stop()
   }

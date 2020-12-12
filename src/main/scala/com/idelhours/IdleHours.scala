@@ -1,6 +1,7 @@
 package com.idelhours
 
 import org.apache.log4j.Logger
+import org.apache.spark.sql.functions.{col, collect_list, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class IdleHours(sparkSession: SparkSession) {
@@ -42,9 +43,27 @@ class IdleHours(sparkSession: SparkSession) {
   def analyzeKeyboardAndMouseDataFromTable(userlogDF: DataFrame): DataFrame = {
     userlogDF.createTempView("userlog_KMAnalyze")
     val keyMouseAnalyzedDF = sparkSession.sql(
-      """select username,datetime,case when keyboard > 0.0 or mouse > 0.0 then 1 else 0 end as KM_analyzed from userlog_KMAnalyze"""
+      """SELECT username,datetime,CASE WHEN keyboard > 0.0 OR mouse > 0.0 THEN 1 ELSE 0 END as KMAnalyzed FROM userlog_KMAnalyze"""
     )
     keyMouseAnalyzedDF
   }
-  def groupConcatTheData(keyMouseAnalyzedDF: DataFrame) = ???
+
+  def groupConcatTheData(keyMouseAnalyzedDF: DataFrame): DataFrame = {
+    val selectDataDF = keyMouseAnalyzedDF.select(
+      col("username"),
+      substring(col("datetime"), 1, 10) as "dates",
+      col("KMAnalyzed")
+    )
+    val groupConcatDF = selectDataDF
+      .groupBy("username", "dates")
+      .agg(
+        collect_list("KMAnalyzed")
+          .as("guessIdleHr")
+      )
+    /*groupConcatDF.take(1).foreach { row =>
+      val arr = row.get(2).asInstanceOf[Seq[Int]]
+      println(arr)
+    } */
+    groupConcatDF
+  }
 }

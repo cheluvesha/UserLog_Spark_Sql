@@ -1,19 +1,20 @@
 package com.userloganalysisTest
 
 import java.sql.Timestamp
-
 import com.Utility.UtilityClass
 import com.idelhours.IdleHours
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
-
-import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 import scala.collection.mutable
 
 class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   var spark: SparkSession = _
   var idleHours: IdleHours = _
+  val dbName: String = System.getenv("DB_NAME")
+  val readTable: String = System.getenv("TABLE")
+  val username: String = System.getenv("MYSQL_UN")
+  val password: String = System.getenv("MYSQL_PW")
   val data = Seq(
     ("2019-05-21 06:05:02", "xyzname", 10.0, 41.00),
     ("2019-05-21 15:05:02", "testname", 0.0, 0.0),
@@ -38,7 +39,10 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   var dailyHourDF: DataFrame = _
   var hourTestDF: DataFrame = _
   var keyMouseTestDF: DataFrame = _
-
+  var readRowData: Array[Row] = _
+  val zeroOrOne: Array[Int] =
+    Array(1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
+  val zeros = 13
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
     idleHours = new IdleHours(spark)
@@ -47,15 +51,29 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     userlogReadTestDF = data.toDF(column: _*)
     userlogReadTestDF.withColumn("datetime", to_timestamp(col("datetime")))
   }
-
+  test("givenDataToConnectMysqlToCheckDataBaseConnection") {
+    val readDataFromMysql = idleHours
+      .readDataFromMySqlForDataFrame("testDB", "test", username, password)
+      .take(1)
+    readDataFromMysql.foreach { row =>
+      assert(row.get(0).toString === "2020-12-13 01:59:00.0")
+      assert(row.get(1) === "vesha")
+    }
+  }
   test("DataFrameCountMustBeGreaterThanZero") {
-    val userlogRowDF = idleHours.readDataFromMySqlForDataFrame()
+    val userlogRowDF =
+      idleHours.readDataFromMySqlForDataFrame(
+        dbName,
+        readTable,
+        username,
+        password
+      )
+    readRowData = userlogRowDF.take(1)
     assert(userlogRowDF.count() > 0)
   }
 
   test("DateFrameTypeMustToTheGivenType") {
-    val rowList = idleHours.readDataFromMySqlForDataFrame().take(1)
-    rowList.foreach { row =>
+    readRowData.foreach { row =>
       assert(
         row.get(0).isInstanceOf[Timestamp],
         "zero column should be Timestamp"
@@ -67,12 +85,11 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("checkTheDataOfDataFrame") {
-    val rowData = idleHours.readDataFromMySqlForDataFrame().take(1)
     var time: Any = null
     var name: Any = null
     var keyboard: Any = null
     var mouse: Any = null
-    rowData.foreach { row =>
+    readRowData.foreach { row =>
       time = row.get(0)
       name = row.get(1)
       keyboard = row.get(2)
@@ -99,13 +116,15 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
       )
     assert(
       keyMouseMap
-        .getOrElse(keyMouseDataTest1.head.toString, 0) === keyMouseDataTest1
-        .get(1) + " " + keyMouseDataTest1.get(2)
+        .getOrElse(keyMouseDataTest1.head.toString, 0) === keyMouseDataTest1(
+        1
+      ) + " " + keyMouseDataTest1(2)
     )
     assert(
       keyMouseMap
-        .getOrElse(keyMouseDataTest2.head.toString, 0) === keyMouseDataTest2
-        .get(1) + " " + keyMouseDataTest2.get(2)
+        .getOrElse(keyMouseDataTest2.head.toString, 0) === keyMouseDataTest2(
+        1
+      ) + " " + keyMouseDataTest2(2)
     )
   }
   test("givenDataFrameMustPerformGrpConcatAndDataFrameShouldEqualToExpected") {
@@ -128,7 +147,10 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
       guessIdleHrMap
         .getOrElse(grpConcatData.last.head, 0) === grpConcatData.last.last
     )
-
+  }
+  test("givenArrayAsInputMustCheckNoOfZerosAndReturnDataMustEqualToActual") {
+    val noOfZeros = idleHours.checkForZeros(zeroOrOne)
+    assert(zeros === noOfZeros)
   }
 
 }

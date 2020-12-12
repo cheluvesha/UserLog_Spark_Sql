@@ -45,7 +45,9 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   val zeros = 13
   val idleTime = 1.08
   val testDFMap: mutable.LinkedHashMap[String, Double] =
-    mutable.LinkedHashMap[String, Double]("xyzname" -> 10.0)
+    mutable.LinkedHashMap[String, Double]("xyzname" -> 10.0, "testname" -> 15.0)
+  var createdTestDF: DataFrame = _
+
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
     idleHours = new IdleHours(spark)
@@ -160,11 +162,18 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     assert(idleTime === time)
   }
   test("givenMapAsAnInputMustCreateDataFrame") {
-    val dataFrameData = idleHours.createDataFrame(testDFMap).take(1)
-    dataFrameData.foreach { row =>
+    createdTestDF = idleHours.createDataFrame(testDFMap)
+    createdTestDF.take(1).foreach { row =>
       assert(row.get(0) === "xyzname")
       assert(row.get(1) === 10.0)
     }
-
+  }
+  test("givenDataFrameWhenItMustSortWithHigherValues") {
+    val name = "testname"
+    val higherOrder = idleHours.findHighestIdleHour(createdTestDF).take(1)
+    higherOrder.foreach { row =>
+      assert(name === row.get(0))
+      assert(testDFMap.getOrElse(name, 0.0) === row.get(1))
+    }
   }
 }

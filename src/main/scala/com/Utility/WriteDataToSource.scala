@@ -1,12 +1,14 @@
 package com.Utility
 
 import java.util.Properties
-import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 /***
   * Class writes analyzed data to Mysql table, Json and Xml Format
   */
 object WriteDataToSource {
+
   val sparkSession: SparkSession =
     UtilityClass.createSparkSessionObj("Write Data to source")
 
@@ -30,6 +32,20 @@ object WriteDataToSource {
     writeData.write
       .mode("append")
       .jdbc("jdbc:mysql://localhost:3306/" + dbName, tableName, prop)
+    true
+  }
+  def writeDataFrameToXML(
+      dataFrame: DataFrame,
+      xmlFilePath: String
+  ): Boolean = {
+    dataFrame
+      .coalesce(1)
+      .write
+      .mode(SaveMode.Overwrite)
+      .format("com.databricks.spark.xml")
+      .option("rootTag", "Userlogs")
+      .option("rowTag", "Userlog")
+      .save(xmlFilePath)
     true
   }
 }

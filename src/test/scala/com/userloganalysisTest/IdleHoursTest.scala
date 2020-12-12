@@ -43,6 +43,9 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   val zeroOrOne: Array[Int] =
     Array(1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
   val zeros = 13
+  val idleTime = 1.08
+  val testDFMap: mutable.LinkedHashMap[String, Double] =
+    mutable.LinkedHashMap[String, Double]("xyzname" -> 10.0)
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
     idleHours = new IdleHours(spark)
@@ -152,5 +155,16 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     val noOfZeros = idleHours.checkForZeros(zeroOrOne)
     assert(zeros === noOfZeros)
   }
+  test("givenArrayAsInputMustCalculateTimeAndResultMustEqualToActual") {
+    val time = idleHours.evaluateTime(zeroOrOne)
+    assert(idleTime === time)
+  }
+  test("givenMapAsAnInputMustCreateDataFrame") {
+    val dataFrameData = idleHours.createDataFrame(testDFMap).take(1)
+    dataFrameData.foreach { row =>
+      assert(row.get(0) === "xyzname")
+      assert(row.get(1) === 10.0)
+    }
 
+  }
 }

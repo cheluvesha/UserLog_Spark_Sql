@@ -34,7 +34,14 @@ object WriteDataToSource {
       .jdbc("jdbc:mysql://localhost:3306/" + dbName, tableName, prop)
     true
   }
-  def writeDataFrameToXML(
+
+  /***
+    * Writes data into xml format
+    * @param dataFrame DataFrame
+    * @param xmlFilePath String
+    * @return Boolean
+    */
+  def writeDataFrameInToXMLFormat(
       dataFrame: DataFrame,
       xmlFilePath: String
   ): Boolean = {
@@ -46,6 +53,24 @@ object WriteDataToSource {
       .option("rootTag", "Userlogs")
       .option("rowTag", "Userlog")
       .save(xmlFilePath)
+    true
+  }
+
+  /***
+    * Writes data into Json format
+    * @param dataFrame DataFrame
+    * @param jsonFilePath String
+    * @return Boolean
+    */
+  def writeDataFrameIntoJsonFormat(
+      dataFrame: DataFrame,
+      jsonFilePath: String
+  ): Boolean = {
+    dataFrame
+      .coalesce(1)
+      .write
+      .mode(SaveMode.Overwrite)
+      .json(jsonFilePath)
     true
   }
 }

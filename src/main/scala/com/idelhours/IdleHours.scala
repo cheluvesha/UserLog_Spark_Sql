@@ -11,6 +11,11 @@ class IdleHours(sparkSession: SparkSession) {
 
   /***
     * Reads Data From Mysql Database and Creates DataFrame
+    * @param dbName String
+    * @param tableName String
+    * @param username String
+    * @param password String
+    * @param url String
     * @return DataFrame
     */
   def readDataFromMySqlForDataFrame(

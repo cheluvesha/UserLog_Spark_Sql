@@ -15,6 +15,7 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   val readTable: String = System.getenv("TABLE")
   val username: String = System.getenv("MYSQL_UN")
   val password: String = System.getenv("MYSQL_PW")
+  val url: String = System.getenv("URL")
   val data = Seq(
     ("2019-05-21 06:05:02", "xyzname", 10.0, 41.00),
     ("2019-05-21 15:05:02", "testname", 0.0, 0.0),
@@ -58,7 +59,7 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   }
   test("givenDataToConnectMysqlToCheckDataBaseConnection") {
     val readDataFromMysql = idleHours
-      .readDataFromMySqlForDataFrame("testDB", "test", username, password)
+      .readDataFromMySqlForDataFrame("testDB", "test", username, password, url)
       .take(1)
     readDataFromMysql.foreach { row =>
       assert(row.get(0).toString === "2020-12-13 01:59:00.0")
@@ -71,7 +72,8 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
         dbName,
         readTable,
         username,
-        password
+        password,
+        url
       )
     readRowData = userlogRowDF.take(1)
     assert(userlogRowDF.count() > 0)

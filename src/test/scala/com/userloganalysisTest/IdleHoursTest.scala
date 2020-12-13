@@ -57,6 +57,7 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     userlogReadTestDF = data.toDF(column: _*)
     userlogReadTestDF.withColumn("datetime", to_timestamp(col("datetime")))
   }
+
   test("givenDataToConnectMysqlToCheckDataBaseConnection") {
     val readDataFromMysql = idleHours
       .readDataFromMySqlForDataFrame("testDB", "test", username, password, url)
@@ -64,6 +65,17 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     readDataFromMysql.foreach { row =>
       assert(row.get(0).toString === "2020-12-13 01:59:00.0")
       assert(row.get(1) === "vesha")
+    }
+  }
+  test(
+    "givenDataToConnectMysqlToCheckDataBaseConnectionAndShouldNotEqualToActual"
+  ) {
+    val readDataFromMysql = idleHours
+      .readDataFromMySqlForDataFrame("testDB", "test", username, password, url)
+      .take(1)
+    readDataFromMysql.foreach { row =>
+      assert(row.get(0).toString != "2020-12-1:59:00.0")
+      assert(row.get(1) != "wrong")
     }
   }
   test("DataFrameCountMustBeGreaterThanZero") {
@@ -79,7 +91,7 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     assert(userlogRowDF.count() > 0)
   }
 
-  test("DateFrameTypeMustToTheGivenType") {
+  test("DateFrameTypeMustEqualToTheGivenType") {
     readRowData.foreach { row =>
       assert(
         row.get(0).isInstanceOf[Timestamp],
@@ -108,6 +120,14 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     assert(name === "rahilstar11@gmail.com")
 
   }
+  test("checkTheDataOfDataFrameMustNotEqualToZero") {
+    readRowData.foreach { row =>
+      assert(row.get(0) != "")
+      assert(row.get(1) != 0.2)
+      assert(row.get(2) != 0.2)
+      assert(row.get(3) != "")
+    }
+  }
   test("givenInputDataFrameMustPerformSomeConditionAndShouldReturnDF") {
     keyMouseTestDF =
       idleHours.analyzeKeyboardAndMouseDataFromTable(userlogReadTestDF)
@@ -134,7 +154,9 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
       ) + " " + keyMouseDataTest2(2)
     )
   }
-  test("givenDataFrameMustPerformGrpConcatAndDataFrameShouldEqualToExpected") {
+  test(
+    "givenDataFrameMustPerformGrpConcatAndDataFrameShouldEqualToExpected"
+  ) {
     val guessIdleHrDF = idleHours.groupConcatTheData(keyMouseTestDF)
     val guessIdleHrMap = new mutable.HashMap[String, String]()
     guessIdleHrDF.collect().foreach { row =>
@@ -159,9 +181,19 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     val noOfZeros = idleHours.checkForZeros(zeroOrOne)
     assert(zeros === noOfZeros)
   }
+  test(
+    "givenArrayAsInputMustCheckNoOfZerosAndReturnDataMustNotEqualToExpected"
+  ) {
+    val noOfZeros = idleHours.checkForZeros(zeroOrOne)
+    assert(noOfZeros != 5)
+  }
   test("givenArrayAsInputMustCalculateTimeAndResultMustEqualToActual") {
     val time = idleHours.evaluateTime(zeroOrOne)
     assert(idleTime === time)
+  }
+  test("givenArrayAsInputMustCalculateTimeAndResultMustNotEqualToExpected") {
+    val time = idleHours.evaluateTime(zeroOrOne)
+    assert(time != 0)
   }
   test("givenMapAsAnInputMustCreateDataFrame") {
     createdTestDF = idleHours.createDataFrame(testDFMap)
@@ -170,12 +202,45 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
       assert(row.get(1) === 10.0)
     }
   }
-  test("givenDataFrameWhenItMustSortWithHigherValues") {
+  test("givenMapAsAnInputMustCreateDataFrameAndDFMustNotEqualToActual") {
+    createdTestDF = idleHours.createDataFrame(testDFMap)
+    createdTestDF.take(1).foreach { row =>
+      assert(row.get(0) != "")
+      assert(row.get(1) != 0.0)
+    }
+  }
+  test("givenDataFrameItMustSortWithHigherValues") {
     val name = "testname"
     val higherOrder = idleHours.findHighestIdleHour(createdTestDF).take(1)
     higherOrder.foreach { row =>
       assert(name === row.get(0))
       assert(testDFMap.getOrElse(name, 0.0) === row.get(1))
     }
+  }
+  test("givenNullDataToReadDataFromMysqlItMustTriggerAnException") {
+    val thrown = intercept[Exception] {
+      idleHours.readDataFromMySqlForDataFrame(null, null, null, null, null)
+    }
+    assert(
+      thrown.getMessage === "Parameters Are Null,Please Check The Passed Parameters"
+    )
+  }
+  test("givenWrongDataToReadDataFromMysqlItMustTriggerAnException") {
+    val thrown = intercept[Exception] {
+      idleHours.readDataFromMySqlForDataFrame(
+        dbName,
+        readTable,
+        username,
+        password,
+        ""
+      )
+    }
+    assert(
+      thrown.getMessage === "Parameters Are Null,Please Check The Passed Parameters"
+    )
+  }
+
+  override def afterAll(): Unit = {
+    spark.stop()
   }
 }

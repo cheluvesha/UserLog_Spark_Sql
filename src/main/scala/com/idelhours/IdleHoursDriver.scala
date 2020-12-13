@@ -3,7 +3,7 @@ package com.idelhours
 import com.Utility.{UtilityClass, WriteDataToSource}
 
 /***
-  * Driver Class Performs IdleHour Analysis
+  * Driver Class Performs IdleHour ETL Operations
   */
 object IdleHoursDriver extends App {
   try {

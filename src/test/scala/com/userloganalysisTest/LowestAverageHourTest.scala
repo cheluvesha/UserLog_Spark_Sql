@@ -5,14 +5,19 @@ import java.sql.Timestamp
 import com.Utility.UtilityClass
 import com.lowestAverageHours.LowestAverageHour
 import org.apache.spark.sql.functions.{col, to_timestamp}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import scala.collection.mutable
 
 class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
   var spark: SparkSession = _
-  var averageLowestHour: LowestAverageHour = _
+  val dbName: String = System.getenv("DB_NAME")
+  val readTable: String = System.getenv("TABLE")
+  val username: String = System.getenv("MYSQL_UN")
+  val password: String = System.getenv("MYSQL_PW")
+  val url: String = System.getenv("URL")
+  var lowestAverageHour: LowestAverageHour = _
   val data = Seq(
     ("2019-05-21 06:05:02", "xyzname", 10.0, 41.00),
     ("2019-05-21 15:05:02", "xyzname", 10.0, 41.00),
@@ -31,22 +36,51 @@ class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
   val hourTestData = Seq("xyzname", "2019-05-21", 9.0)
   var dailyHourDF: DataFrame = _
   var hourTestDF: DataFrame = _
+  var readRowData: Array[Row] = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
-    averageLowestHour = new LowestAverageHour(spark)
+    lowestAverageHour = new LowestAverageHour(spark)
     val spark1 = spark
     import spark1.implicits._
     splitTestDF = data.toDF(column: _*)
     splitTestDF.withColumn("datetime", to_timestamp(col("datetime")))
   }
+
+  test("givenDataToConnectMysqlToCheckDataBaseConnection") {
+    val readDataFromMysql = lowestAverageHour
+      .readDataFromMySqlForDataFrame("testDB", "test", username, password, url)
+      .take(1)
+    readDataFromMysql.foreach { row =>
+      assert(row.get(0).toString === "2020-12-13 01:59:00.0")
+      assert(row.get(1) === "vesha")
+    }
+  }
+  test(
+    "givenDataToConnectMysqlToCheckDataBaseConnectionAndShouldNotEqualToActual"
+  ) {
+    val readDataFromMysql = lowestAverageHour
+      .readDataFromMySqlForDataFrame("testDB", "test", username, password, url)
+      .take(1)
+    readDataFromMysql.foreach { row =>
+      assert(row.get(0).toString != "2020-12-1:59:00.0")
+      assert(row.get(1) != "wrong")
+    }
+  }
   test("DataFrameCountMustBeGreaterThanZero") {
-    val userlogRowDF = averageLowestHour.readDataFromMySqlForDataFrame()
+    val userlogRowDF =
+      lowestAverageHour.readDataFromMySqlForDataFrame(
+        dbName,
+        readTable,
+        username,
+        password,
+        url
+      )
+    readRowData = userlogRowDF.take(1)
     assert(userlogRowDF.count() > 0)
   }
 
-  test("DateFrameTypeMustToTheGivenType") {
-    val rowList = averageLowestHour.readDataFromMySqlForDataFrame().take(1)
-    rowList.foreach { row =>
+  test("DateFrameTypeMustEqualToTheGivenType") {
+    readRowData.foreach { row =>
       assert(
         row.get(0).isInstanceOf[Timestamp],
         "zero column should be Timestamp"
@@ -58,12 +92,11 @@ class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("checkTheDataOfDataFrame") {
-    val rowData = averageLowestHour.readDataFromMySqlForDataFrame().take(1)
     var time: Any = null
     var name: Any = null
     var keyboard: Any = null
     var mouse: Any = null
-    rowData.foreach { row =>
+    readRowData.foreach { row =>
       time = row.get(0)
       name = row.get(1)
       keyboard = row.get(2)
@@ -75,10 +108,18 @@ class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     assert(name === "rahilstar11@gmail.com")
 
   }
+  test("checkTheDataOfDataFrameMustNotEqualToZero") {
+    readRowData.foreach { row =>
+      assert(row.get(0) != "")
+      assert(row.get(1) != 0.2)
+      assert(row.get(2) != 0.2)
+      assert(row.get(3) != "")
+    }
+  }
   test(
     "givenDataFrameAsInputMustPerformSplitTimeAndDateShouldEqualToExceptedDataFrame"
   ) {
-    minMaxTestDF = averageLowestHour.splitAndCreateUserlogDF(splitTestDF)
+    minMaxTestDF = lowestAverageHour.splitAndCreateUserlogDF(splitTestDF)
     assert(minMaxTestDF.schema.toString() === splitSchemaDF)
     minMaxTestDF.take(1).foreach { row =>
       assert(row.get(0).toString === resultDFContent.head)
@@ -87,7 +128,7 @@ class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("givenMinMaxTestDFAsInputToFindMinAndMaxAndResultMustEqualToExpected") {
-    dailyHourDF = averageLowestHour.findMinAndMaxTimeForUsers(minMaxTestDF)
+    dailyHourDF = lowestAverageHour.findMinAndMaxTimeForUsers(minMaxTestDF)
     assert(dailyHourDF.schema.toString() === minMaxSchema)
     dailyHourDF.take(1).foreach { row =>
       assert(row.get(0) === dailyHourData.head)
@@ -97,7 +138,7 @@ class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("givenInputDFAsInputToCalculateDailyHourAndResultMustEqualToExpected") {
-    hourTestDF = averageLowestHour.calculateDailyHour(dailyHourDF)
+    hourTestDF = lowestAverageHour.calculateDailyHour(dailyHourDF)
     hourTestDF.take(1).foreach { rowData =>
       assert(rowData.get(0) === hourTestData.head)
       assert(rowData.get(1).toString === hourTestData(1))
@@ -105,13 +146,41 @@ class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("givenInputDFAsInputToSumDailyHoursAndResultMustEqualToExcepted") {
-    val sumHourDF = averageLowestHour.sumDailyHourWRTUser(hourTestDF)
+    val sumHourDF = lowestAverageHour.sumDailyHourWRTUser(hourTestDF)
     val userAndHourMap = new mutable.HashMap[String, String]()
     sumHourDF.collect().foreach { user =>
       userAndHourMap.put(user.get(0).toString, user.get(1).toString)
     }
     assert(userAndHourMap("xyzname") == "9.0")
     assert(userAndHourMap("testname") == "0.0")
+  }
+  test("givenNullDataToReadDataFromMysqlItMustTriggerAnException") {
+    val thrown = intercept[Exception] {
+      lowestAverageHour.readDataFromMySqlForDataFrame(
+        null,
+        null,
+        null,
+        null,
+        null
+      )
+    }
+    assert(
+      thrown.getMessage === "Parameters Are Null,Please Check The Passed Parameters"
+    )
+  }
+  test("givenWrongDataToReadDataFromMysqlItMustTriggerAnException") {
+    val thrown = intercept[Exception] {
+      lowestAverageHour.readDataFromMySqlForDataFrame(
+        dbName,
+        readTable,
+        username,
+        password,
+        ""
+      )
+    }
+    assert(
+      thrown.getMessage === "Parameters Are Null,Please Check The Passed Parameters"
+    )
   }
   override def afterAll(): Unit = {
     spark.stop()

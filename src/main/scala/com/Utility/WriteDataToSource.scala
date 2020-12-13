@@ -24,15 +24,24 @@ object WriteDataToSource {
       dbName: String,
       tableName: String
   ): Boolean = {
-    dataFrame.createTempView("tableToWrite")
-    val writeData = sparkSession.sql("""SELECT * FROM tableToWrite""")
-    val prop = new Properties()
-    prop.setProperty("user", System.getenv("MYSQL_UN"))
-    prop.setProperty("password", System.getenv(("MYSQL_PW")))
-    writeData.write
-      .mode("overwrite")
-      .jdbc(System.getenv("URL") + dbName, tableName, prop)
-    true
+    try {
+      dataFrame.createTempView("tableToWrite")
+      val writeData = sparkSession.sql("""SELECT * FROM tableToWrite""")
+      val prop = new Properties()
+      prop.setProperty("user", System.getenv("MYSQL_UN"))
+      prop.setProperty("password", System.getenv("MYSQL_PW"))
+      writeData.write
+        .mode("overwrite")
+        .jdbc(System.getenv("URL") + dbName, tableName, prop)
+      true
+    } catch {
+      case nullPointerException: NullPointerException =>
+        throw new Exception(
+          "Null values received, Please Check the Passed Parameters"
+        )
+      case ex: Exception =>
+        throw new Exception("Unable To Read Data From Mysql Database")
+    }
   }
 
   /***
@@ -45,15 +54,22 @@ object WriteDataToSource {
       dataFrame: DataFrame,
       xmlFilePath: String
   ): Boolean = {
-    dataFrame
-      .coalesce(1)
-      .write
-      .mode(SaveMode.Overwrite)
-      .format("com.databricks.spark.xml")
-      .option("rootTag", "Userlogs")
-      .option("rowTag", "Userlog")
-      .save(xmlFilePath)
-    true
+    try {
+      dataFrame
+        .coalesce(1)
+        .write
+        .mode(SaveMode.Overwrite)
+        .format("com.databricks.spark.xml")
+        .option("rootTag", "Userlogs")
+        .option("rowTag", "Userlog")
+        .save(xmlFilePath)
+      true
+    } catch {
+      case classNotFoundException: ClassNotFoundException =>
+        throw new Exception(
+          "com.databricks.spark.xml not found, Please specify the dependency"
+        )
+    }
   }
 
   /***

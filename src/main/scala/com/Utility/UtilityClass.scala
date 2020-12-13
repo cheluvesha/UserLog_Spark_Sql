@@ -1,5 +1,6 @@
 package com.Utility
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 /***
@@ -13,9 +14,11 @@ object UtilityClass {
     * @return SparkSession
     */
   def createSparkSessionObj(appName: String): SparkSession = {
+
     val spark = SparkSession
       .builder()
       .appName(appName)
+      .config("spark.driver.host", "localhost")
       .master("local[*]")
       .getOrCreate()
     spark

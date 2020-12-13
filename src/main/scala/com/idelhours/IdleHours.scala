@@ -1,12 +1,12 @@
 package com.idelhours
 
+import java.sql.SQLSyntaxErrorException
 import org.apache.log4j.Logger
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import scala.collection.mutable
 
 class IdleHours(sparkSession: SparkSession) {
 
-  sparkSession.sparkContext.setLogLevel("OFF")
   lazy val logger: Logger = Logger.getLogger(getClass.getName)
 
   /***
@@ -17,26 +17,42 @@ class IdleHours(sparkSession: SparkSession) {
       dbName: String,
       tableName: String,
       username: String,
-      password: String
+      password: String,
+      url: String
   ): DataFrame = {
     logger.info("Read operation started to create dataframe from mysql")
     try {
       val userlogReadDF = sparkSession.read
         .format("jdbc")
-        .option("url", "jdbc:mysql://localhost:3306/" + dbName)
+        .option("url", url + dbName)
         .option("driver", "com.mysql.cj.jdbc.Driver")
         .option("dbtable", tableName)
-        .option("user", System.getenv("MYSQL_UN"))
-        .option("password", System.getenv("MYSQL_PW"))
+        .option("user", username)
+        .option("password", password)
         .load()
       logger.info("Read operation ended")
       val userlogDF =
         userlogReadDF.select("datetime", "username", "keyboard", "mouse")
       userlogDF
     } catch {
+      case nullPointerException: NullPointerException =>
+        logger.error(nullPointerException.printStackTrace())
+        throw new Exception(
+          "Parameters Are Null,Please Check The Passed Parameters"
+        )
+      case sqlSyntaxErrorException: SQLSyntaxErrorException =>
+        logger.error(sqlSyntaxErrorException.printStackTrace())
+        throw new Exception(
+          "Fault Database Credentials, Please Provide Proper DB and Table configurations"
+        )
+      case sparkAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sparkAnalysisException.printStackTrace())
+        throw new Exception(
+          "Please Provide Existing Column Name to Select Column From DataFrame"
+        )
       case ex: Exception =>
         logger.error(ex.printStackTrace())
-        throw new Exception("Unable to read data from mysql database")
+        throw new Exception("Unable To Read Data From Mysql Database")
     }
   }
 
@@ -46,11 +62,21 @@ class IdleHours(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def analyzeKeyboardAndMouseDataFromTable(userlogDF: DataFrame): DataFrame = {
-    userlogDF.createTempView("userlog_KMAnalyze")
-    val keyMouseAnalyzedDF = sparkSession.sql(
-      """SELECT username,datetime,CASE WHEN keyboard > 0.0 OR mouse > 0.0 THEN 1 ELSE 0 END AS KMAnalyzed FROM userlog_KMAnalyze"""
-    )
-    keyMouseAnalyzedDF
+    logger.info("Executing analyzeKeyboardAndMouseDataFromTable")
+    try {
+      userlogDF.createTempView("userlog_KMAnalyze")
+      val keyMouseAnalyzedDF = sparkSession.sql(
+        """SELECT username,datetime,CASE WHEN keyboard > 0.0 OR mouse > 0.0 THEN 1 ELSE 0 END AS KMAnalyzed FROM userlog_KMAnalyze"""
+      )
+      keyMouseAnalyzedDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+      case ex: Exception =>
+        logger.error(ex.printStackTrace())
+        throw new Exception("Unable To Analyze Keyboard and Mouse Data")
+    }
   }
 
   /***
@@ -60,11 +86,21 @@ class IdleHours(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def groupConcatTheData(keyMouseAnalyzedDF: DataFrame): DataFrame = {
-    keyMouseAnalyzedDF.createTempView("KMAnalyzedTable")
-    val groupConcatDF = sparkSession.sql(
-      """SELECT username,SUBSTR(datetime,1,10) as dates,collect_list(KMAnalyzed) AS guessIdleHr FROM KMAnalyzedTable GROUP BY username, dates"""
-    )
-    groupConcatDF
+    logger.info("Executing groupConcatTheData")
+    try {
+      keyMouseAnalyzedDF.createTempView("KMAnalyzedTable")
+      val groupConcatDF = sparkSession.sql(
+        """SELECT username,SUBSTR(datetime,1,10) as dates,collect_list(KMAnalyzed) AS guessIdleHr FROM KMAnalyzedTable GROUP BY username, dates"""
+      )
+      groupConcatDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+      case ex: Exception =>
+        logger.error(ex.printStackTrace())
+        throw new Exception("Unable To Analyze Keyboard and Mouse Data")
+    }
   }
 
   /***
@@ -79,23 +115,29 @@ class IdleHours(sparkSession: SparkSession) {
     var zeroCount = one
     var countedZero = zero
     var mins = zero
-    while (mins < arrayMins.length - one) {
-      if ((arrayMins(mins) == zero) && (arrayMins(mins + one) == zero)) {
-        zeroCount += one
-      } else {
-        if (zeroCount >= idleLimit) {
-          countedZero += zeroCount
-          zeroCount = one
+    try {
+      while (mins < arrayMins.length - one) {
+        if ((arrayMins(mins) == zero) && (arrayMins(mins + one) == zero)) {
+          zeroCount += one
         } else {
-          zeroCount = one
+          if (zeroCount >= idleLimit) {
+            countedZero += zeroCount
+            zeroCount = one
+          } else {
+            zeroCount = one
+          }
         }
+        mins += one
       }
-      mins += one
+      if (zeroCount >= idleLimit) {
+        countedZero += zeroCount
+      }
+      countedZero
+    } catch {
+      case ex: Exception =>
+        logger.error(ex.printStackTrace())
+        throw new Exception("Unable To Find Sequence Of Zeros")
     }
-    if (zeroCount >= idleLimit) {
-      countedZero += zeroCount
-    }
-    countedZero
   }
 
   /***
@@ -127,6 +169,7 @@ class IdleHours(sparkSession: SparkSession) {
   def findIdleHour(
       guessIdleHrsDF: DataFrame
   ): mutable.LinkedHashMap[String, Double] = {
+    logger.info("Executing findIdleHour")
     val collectUserData = guessIdleHrsDF.collect()
     val userLogData = new mutable.LinkedHashMap[String, Double]
     collectUserData.foreach { rowData =>
@@ -152,6 +195,7 @@ class IdleHours(sparkSession: SparkSession) {
   def createDataFrame(
       usersIdleHoursData: mutable.LinkedHashMap[String, Double]
   ): DataFrame = {
+    logger.info("Executing CreateDataFrame")
     import sparkSession.implicits._
     val usersSchema = Seq("username", "idlehours")
     val idleHoursDF = usersIdleHoursData.toSeq.toDF(usersSchema: _*)
@@ -164,10 +208,17 @@ class IdleHours(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def findHighestIdleHour(usersIdleHoursDF: DataFrame): DataFrame = {
-    usersIdleHoursDF.createTempView("usersIdleHours")
-    val highToLowIdleHrDF = sparkSession.sql(
-      """SELECT username, idlehours FROM usersIdleHours ORDER BY idlehours DESC"""
-    )
-    highToLowIdleHrDF
+    logger.info("Executing findHighestIdleHour")
+    try {
+      usersIdleHoursDF.createTempView("usersIdleHours")
+      val highToLowIdleHrDF = sparkSession.sql(
+        """SELECT username, idlehours FROM usersIdleHours ORDER BY idlehours DESC"""
+      )
+      highToLowIdleHrDF
+    } catch {
+      case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlAnalysisException.printStackTrace())
+        throw new Exception("SQL Syntax Error, Please Check the Syntax")
+    }
   }
 }

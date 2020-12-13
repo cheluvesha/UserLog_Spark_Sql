@@ -27,11 +27,11 @@ object WriteDataToSource {
     dataFrame.createTempView("tableToWrite")
     val writeData = sparkSession.sql("""SELECT * FROM tableToWrite""")
     val prop = new Properties()
-    prop.setProperty("user", "user")
-    prop.setProperty("password", "user00")
+    prop.setProperty("user", System.getenv("MYSQL_UN"))
+    prop.setProperty("password", System.getenv(("MYSQL_PW")))
     writeData.write
-      .mode("append")
-      .jdbc("jdbc:mysql://localhost:3306/" + dbName, tableName, prop)
+      .mode("overwrite")
+      .jdbc(System.getenv("URL") + dbName, tableName, prop)
     true
   }
 

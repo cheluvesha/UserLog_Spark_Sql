@@ -239,4 +239,8 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
       thrown.getMessage === "Parameters Are Null,Please Check The Passed Parameters"
     )
   }
+
+  override def afterAll(): Unit = {
+    spark.stop()
+  }
 }

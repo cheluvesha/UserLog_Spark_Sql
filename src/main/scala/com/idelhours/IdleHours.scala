@@ -35,15 +35,15 @@ class IdleHours(sparkSession: SparkSession) {
         userlogReadDF.select("datetime", "username", "keyboard", "mouse")
       userlogDF
     } catch {
-      case nullPointerException: NullPointerException =>
-        logger.error(nullPointerException.printStackTrace())
-        throw new Exception(
-          "Parameters Are Null,Please Check The Passed Parameters"
-        )
       case sqlSyntaxErrorException: SQLSyntaxErrorException =>
         logger.error(sqlSyntaxErrorException.printStackTrace())
         throw new Exception(
           "Fault Database Credentials, Please Provide Proper DB and Table configurations"
+        )
+      case nullPointerException: NullPointerException =>
+        logger.error(nullPointerException.printStackTrace())
+        throw new Exception(
+          "Parameters Are Null,Please Check The Passed Parameters"
         )
       case sparkAnalysisException: org.apache.spark.sql.AnalysisException =>
         logger.error(sparkAnalysisException.printStackTrace())

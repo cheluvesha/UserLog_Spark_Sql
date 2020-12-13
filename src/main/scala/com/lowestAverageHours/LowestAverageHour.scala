@@ -3,6 +3,8 @@ package com.lowestAverageHours
 /***
   * Dependencies used Spark Core and Spark Sql Api
   */
+import java.sql.SQLSyntaxErrorException
+
 import org.apache.log4j.Logger
 import org.apache.spark.sql.functions.{
   col,
@@ -25,27 +27,53 @@ class LowestAverageHour(sparkSession: SparkSession) {
 
   /***
     * Reads Data From Mysql Database and Creates DataFrame
+    * @param dbName String
+    * @param tableName String
+    * @param username String
+    * @param password String
+    * @param url String
     * @return DataFrame
     */
-  def readDataFromMySqlForDataFrame(): DataFrame = {
+  def readDataFromMySqlForDataFrame(
+      dbName: String,
+      tableName: String,
+      username: String,
+      password: String,
+      url: String
+  ): DataFrame = {
     logger.info("Read operation started to create dataframe from mysql")
     try {
       val userlogReadDF = sparkSession.read
         .format("jdbc")
-        .option("url", "jdbc:mysql://localhost:3306/fellowship")
+        .option("url", url + dbName)
         .option("driver", "com.mysql.cj.jdbc.Driver")
-        .option("dbtable", "userlogs")
-        .option("user", "user")
-        .option("password", "user00")
+        .option("dbtable", tableName)
+        .option("user", username)
+        .option("password", password)
         .load()
       logger.info("Read operation ended")
       val userlogDF =
         userlogReadDF.select("datetime", "username", "keyboard", "mouse")
       userlogDF
     } catch {
+      case nullPointerException: NullPointerException =>
+        logger.error(nullPointerException.printStackTrace())
+        throw new Exception(
+          "Parameters Are Null,Please Check The Passed Parameters"
+        )
+      case sqlSyntaxErrorException: SQLSyntaxErrorException =>
+        logger.error(sqlSyntaxErrorException.printStackTrace())
+        throw new Exception(
+          "Fault Database Credentials, Please Provide Proper DB and Table configurations"
+        )
+      case sparkAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sparkAnalysisException.printStackTrace())
+        throw new Exception(
+          "Please Provide Existing Column Name to Select Column From DataFrame"
+        )
       case ex: Exception =>
         logger.error(ex.printStackTrace())
-        throw new Exception("Unable to read data from mysql database")
+        throw new Exception("Unable To Read Data From Mysql Database")
     }
   }
 
@@ -65,6 +93,9 @@ class LowestAverageHour(sparkSession: SparkSession) {
       logger.info("table is created")
       splitDF
     } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
         logger.error(ex.printStackTrace())
         throw new Exception("Unable to split and create userlog dataframe")
@@ -84,6 +115,9 @@ class LowestAverageHour(sparkSession: SparkSession) {
         .agg(min("datetime") as "login", max("datetime") as "logout")
       minAndMaxDF
     } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
         logger.error(ex.printStackTrace())
         throw new Exception("Unable to find min and max and create DataFrame")
@@ -107,6 +141,9 @@ class LowestAverageHour(sparkSession: SparkSession) {
       )
       dailyHourDF
     } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
         logger.error(ex.printStackTrace())
         throw new Exception("Unable to calculate daily hour")
@@ -126,6 +163,9 @@ class LowestAverageHour(sparkSession: SparkSession) {
         .agg(sum("work_durations") as "totalhours")
       summedDF
     } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
         logger.error(ex.printStackTrace())
         throw new Exception("Unable to sum daily userlog time")

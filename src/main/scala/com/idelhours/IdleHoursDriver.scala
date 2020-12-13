@@ -2,13 +2,16 @@ package com.idelhours
 
 import com.Utility.{UtilityClass, WriteDataToSource}
 
+/***
+  * Driver Class Performs IdleHour Analysis
+  */
 object IdleHoursDriver extends App {
   try {
-
     val dbName = System.getenv("DB_NAME")
     val readTable = System.getenv("TABLE")
     val username = System.getenv("MYSQL_UN")
     val password = System.getenv("MYSQL_PW")
+    val url = System.getenv("URL")
     val tableName = "userlog_idlehours"
     val xmlFilePath = "./idleHrs/UserIdleHours.xml"
     val jsonFilePath = "./idleHrs/UserIdleHours.json"
@@ -19,7 +22,8 @@ object IdleHoursDriver extends App {
         dbName,
         readTable,
         username,
-        password
+        password,
+        url
       )
     userlogsDF.printSchema()
     userlogsDF.show()
@@ -64,6 +68,7 @@ object IdleHoursDriver extends App {
     } else {
       println("Unable to write Data into json format")
     }
+    sparkSession.stop()
   } catch {
     case ex: Exception =>
       println(ex.printStackTrace())

@@ -19,7 +19,7 @@ object HighestAverageHourDriver extends App {
     val idleHoursTable = "userlog_idlehours"
     val days = 6
     val sparkSession: SparkSession =
-      UtilityClass.createSparkSessionObj("AverageLowestHours")
+      UtilityClass.createSparkSessionObj("HighestAverageHours")
     val highestAverageHour = new HighestAverageHour(sparkSession)
     val userlogsDataFrame = highestAverageHour.readDataFromMySqlForDataFrame(
       dbName,

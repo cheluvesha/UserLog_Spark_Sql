@@ -33,7 +33,7 @@ object HighestAverageHourDriver extends App {
     val selectColFromDF =
       highestAverageHour.selectRequiredColumn(userlogsDataFrame)
     val splittedDataFrame =
-      highestAverageHour.splitAndCreateUserlogDF(userlogsDataFrame)
+      highestAverageHour.splitAndCreateUserlogDF(selectColFromDF)
     splittedDataFrame.printSchema()
     splittedDataFrame.show()
     val minTimeDF =
@@ -54,7 +54,7 @@ object HighestAverageHourDriver extends App {
     )
     val idleHoursBV = highestAverageHour.createIdleHoursBroadCast(idleHoursDF)
     val overAllAverageHourDF =
-      highestAverageHour.findAverageHourByDifferencingIdleHours(
+      highestAverageHour.findHourByDifferencingIdleHours(
         sumByUserDF,
         idleHoursBV,
         days

@@ -41,7 +41,7 @@ class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
   var testBVIdleHour: Broadcast[collection.Map[String, Double]] = _
   var findHoursTestDF: DataFrame = _
   override def beforeAll(): Unit = {
-    spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
+    spark = UtilityClass.createSparkSessionObj("Average highest hour Test App")
     highestAverageHour = new HighestAverageHour(spark)
     val spark1 = spark
     import spark1.implicits._

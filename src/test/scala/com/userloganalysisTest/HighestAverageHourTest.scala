@@ -3,6 +3,7 @@ package com.userloganalysisTest
 import java.sql.Timestamp
 import com.Utility.UtilityClass
 import com.highestAverageHours.HighestAverageHour
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
@@ -35,6 +36,10 @@ class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
   var dailyHourDF: DataFrame = _
   var hourTestDF: DataFrame = _
   var readRowData: Array[Row] = _
+  var sumHourDF: DataFrame = _
+  val idleBVTestMap = Map("xyzname" -> 2.0, "testname" -> 0.0)
+  var testBVIdleHour: Broadcast[collection.Map[String, Double]] = _
+  var findHoursTestDF: DataFrame = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Average lowest hour Test App")
     highestAverageHour = new HighestAverageHour(spark)
@@ -42,6 +47,7 @@ class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     import spark1.implicits._
     splitTestDF = data.toDF(column: _*)
     splitTestDF.withColumn("datetime", to_timestamp(col("datetime")))
+    testBVIdleHour = spark.sparkContext.broadcast(idleBVTestMap)
   }
 
   test("givenDataToConnectMysqlToCheckDataBaseConnection") {
@@ -146,7 +152,7 @@ class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     }
   }
   test("givenInputDFAsInputToSumDailyHoursAndResultMustEqualToExcepted") {
-    val sumHourDF = highestAverageHour.sumDailyHourWRTUser(hourTestDF)
+    sumHourDF = highestAverageHour.sumDailyHourWRTUser(hourTestDF)
     val userAndHourMap = new mutable.HashMap[String, String]()
     sumHourDF.collect().foreach { user =>
       userAndHourMap.put(user.get(0).toString, user.get(1).toString)
@@ -154,6 +160,7 @@ class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
     assert(userAndHourMap("xyzname") == "9.0")
     assert(userAndHourMap("testname") == "0.0")
   }
+
   test("givenNullDataToReadDataFromMysqlItMustTriggerAnException") {
     val thrown = intercept[Exception] {
       highestAverageHour.readDataFromMySqlForDataFrame(
@@ -182,6 +189,59 @@ class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
       thrown.getMessage === "Parameters Are Null,Please Check The Passed Parameters"
     )
   }
+  test(
+    "givenInputDFForCreateBroadcastVariableCreationItMustCreateAndOutputMustEqualToExpected"
+  ) {
+    val testBVMap = highestAverageHour.createIdleHoursBroadCast(sumHourDF)
+    assert(testBVMap.value.getOrElse("xyzname", 0.0) === 9.0)
+  }
+  test(
+    "givenInputDFForCreateBroadcastVariableCreationItMustCreateAndOutputMustNotEqualToExpected"
+  ) {
+    val testBVMap = highestAverageHour.createIdleHoursBroadCast(sumHourDF)
+    assert(testBVMap.value.getOrElse("xyzname", 0.0) != 0.0)
+  }
+  test(
+    "givenDFAndBroadcastVariableItMustEvaluateAndOutputShouldMatchAsExpected"
+  ) {
+    val findHoursTestDF = highestAverageHour.findHourByDifferencingIdleHours(
+      sumHourDF,
+      testBVIdleHour,
+      1
+    )
+    findHoursTestDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) === "xyzname")
+        assert(row.getDouble(1) === 7.0)
+      })
+  }
+  test(
+    "givenDFAndBroadcastVariableItMustEvaluateAndOutputShouldNotMatchAsExpected"
+  ) {
+    findHoursTestDF = highestAverageHour.findHourByDifferencingIdleHours(
+      sumHourDF,
+      testBVIdleHour,
+      1
+    )
+    findHoursTestDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) != "")
+        assert(row.getDouble(1) != 0.0)
+      })
+  }
+  test("givenDFItMustSortByHighToLowAndOutputMustEqualToAsExpected") {
+    val highToLowDF =
+      highestAverageHour.sortByHighestAverageHours(findHoursTestDF)
+    highToLowDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) === "xyzname")
+        assert(row.getDouble(1) === 7.0)
+      })
+  }
+
   override def afterAll(): Unit = {
     spark.stop()
   }

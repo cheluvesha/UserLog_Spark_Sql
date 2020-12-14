@@ -1,6 +1,6 @@
 package com.highestAverageHours
 
-import com.Utility.UtilityClass
+import com.Utility.{UtilityClass, WriteDataToSource}
 import org.apache.spark.sql.SparkSession
 
 /***
@@ -13,7 +13,7 @@ object HighestAverageHourDriver extends App {
     val username = System.getenv("MYSQL_UN")
     val password = System.getenv("MYSQL_PW")
     val url = System.getenv("URL")
-    val tableName = "userlog_AvgLowHours"
+    val tableName = "userlog_HighAvgHours"
     val xmlFilePath = "./HighHrs/UserAvgHighHours.xml"
     val jsonFilePath = "./HighHrs/UserAvgHighHours.json"
     val idleHoursTable = "userlog_idlehours"
@@ -63,6 +63,36 @@ object HighestAverageHourDriver extends App {
     val highestAverageHourDF =
       highestAverageHour.sortByHighestAverageHours(overAllAverageHourDF)
     highestAverageHourDF.show()
+    val mySqlStatus = WriteDataToSource.writeDataFrameToMysql(
+      highestAverageHourDF,
+      dbName,
+      tableName
+    )
+    if (mySqlStatus) {
+      println("Successfully Data written into Mysql table")
+    } else {
+      println("Unable to write Data into Mysql table")
+    }
+    val xmlStatus =
+      WriteDataToSource.writeDataFrameInToXMLFormat(
+        highestAverageHourDF,
+        xmlFilePath
+      )
+    if (xmlStatus) {
+      println("Successfully Data written into Xml file")
+    } else {
+      println("Unable to write Data into Xml file")
+    }
+    val jsonStatus = WriteDataToSource.writeDataFrameIntoJsonFormat(
+      highestAverageHourDF,
+      jsonFilePath
+    )
+    if (jsonStatus) {
+      println("Successfully Data written into json format")
+    } else {
+      println("Unable to write Data into json format")
+    }
+    sparkSession.stop()
   } catch {
     case ex: Exception =>
       println(ex.printStackTrace())

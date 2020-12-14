@@ -4,25 +4,17 @@ package com.lowestAverageHours
   * Dependencies used Spark Core and Spark Sql Api
   */
 import java.sql.SQLSyntaxErrorException
-
 import org.apache.log4j.Logger
-import org.apache.spark.sql.functions.{
-  col,
-  max,
-  min,
-  sum,
-  to_date,
-  unix_timestamp
-}
+import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /***
-  * AverageLowestHour Class reads data from mysql and creates DataFrame
+  * Class reads data from mysql and creates DataFrame
   * in order to perform analysis and computation on UserLogs Data
   */
 class LowestAverageHour(sparkSession: SparkSession) {
 
-  sparkSession.sparkContext.setLogLevel("OFF")
   lazy val logger: Logger = Logger.getLogger(getClass.getName)
 
   /***
@@ -52,9 +44,7 @@ class LowestAverageHour(sparkSession: SparkSession) {
         .option("password", password)
         .load()
       logger.info("Read operation ended")
-      val userlogDF =
-        userlogReadDF.select("datetime", "username", "keyboard", "mouse")
-      userlogDF
+      userlogReadDF
     } catch {
       case nullPointerException: NullPointerException =>
         logger.error(nullPointerException.printStackTrace())
@@ -74,6 +64,26 @@ class LowestAverageHour(sparkSession: SparkSession) {
       case ex: Exception =>
         logger.error(ex.printStackTrace())
         throw new Exception("Unable To Read Data From Mysql Database")
+    }
+  }
+
+  /***
+    * selects required column from Dataframe
+    * @param userlogsDF DataFrame
+    * @return DataFrame
+    */
+  def selectRequiredColumn(userlogsDF: DataFrame): DataFrame = {
+    logger.info("Executing selectRequiredColumn")
+    try {
+      val userlogSelectDF =
+        userlogsDF.select("datetime", "username", "keyboard", "mouse")
+      userlogSelectDF
+    } catch {
+      case sparkAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sparkAnalysisException.printStackTrace())
+        throw new Exception(
+          "Please Provide Existing Column Name to Select Column From DataFrame"
+        )
     }
   }
 
@@ -160,7 +170,7 @@ class LowestAverageHour(sparkSession: SparkSession) {
     try {
       val summedDF = dailyHourDF
         .groupBy("username")
-        .agg(sum("work_durations") as "totalhours")
+        .agg(round(sum("work_durations"), 2) as "totalhours")
       summedDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
@@ -169,6 +179,74 @@ class LowestAverageHour(sparkSession: SparkSession) {
       case ex: Exception =>
         logger.error(ex.printStackTrace())
         throw new Exception("Unable to sum daily userlog time")
+    }
+  }
+
+  /***
+    * Creates Broadcast variables from idle hours DataFrame
+    * @param idleHoursDF DataFrame
+    * @return Broadcast[collection.Map[String, Double]]
+    */
+  def createIdleHoursBroadCast(
+      idleHoursDF: DataFrame
+  ): Broadcast[collection.Map[String, Double]] = {
+    logger.info("Executing createIdleHoursBroadCast")
+    val idleHoursMap =
+      idleHoursDF.rdd
+        .map(users => (users.getString(0), users.getDouble(1)))
+        .collectAsMap()
+    val broadcastIdleHour = sparkSession.sparkContext.broadcast(idleHoursMap)
+    broadcastIdleHour
+  }
+
+  /***
+    * Calculates working hours by differencing idle hours
+    * @param overAllHoursDF DataFrame
+    * @param idleHoursBV Broadcast[collection.Map[String, Double]]
+    * @param days Int
+    * @return DataFrame
+    */
+  def findHourByDifferencingIdleHours(
+      overAllHoursDF: DataFrame,
+      idleHoursBV: Broadcast[collection.Map[String, Double]],
+      days: Int
+  ): DataFrame = {
+    logger.info("Executing findHourByDifferencingIdleHours")
+    val spark = sparkSession
+    import spark.sqlContext.implicits._
+    val columns = Seq("username", "average_hours")
+    val averageHourDF = overAllHoursDF
+      .map(row => {
+        val username = row.getString(0)
+        val totalHours = row.getDouble(1)
+        val idleHours = idleHoursBV.value.getOrElse(username, 0.0)
+        val overAllHours = (totalHours - idleHours) / days
+        val roundedHours = BigDecimal(overAllHours)
+          .setScale(2, BigDecimal.RoundingMode.HALF_UP)
+          .toDouble
+        (username, roundedHours)
+      })
+      .toDF(columns: _*)
+    averageHourDF
+  }
+
+  /***
+    * Orders the Average hours from lowest to highest
+    * @param overAllAverageHourDF DataFrame
+    * @return DataFrame
+    */
+  def sortByLowestAverageHours(overAllAverageHourDF: DataFrame): DataFrame = {
+    logger.info("Executing sortByLowestAverageHours")
+    try {
+      overAllAverageHourDF.createTempView("overall_average_hours")
+      val lowestAverageHourDF = sparkSession.sql(
+        """SELECT username,average_hours FROM overall_average_hours ORDER BY average_hours"""
+      )
+      lowestAverageHourDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
     }
   }
 }

@@ -41,6 +41,7 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
   var lateComersDF: DataFrame = _
   var lateHoursDF: DataFrame = _
   var sumLateHourDF: DataFrame = _
+  var noOfLeavesDF: DataFrame = _
   var noOfLateBroadCast: Broadcast[collection.Map[String, Long]] = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Late Analysis Test")
@@ -228,7 +229,7 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
   test(
     "givenDFAsInputToFindUsersTotalNumberOfLeavesOutputMustEqualToExpected"
   ) {
-    val noOfLeavesDF =
+    noOfLeavesDF =
       userlogLateAnalysis.findUsersTotalNumberOfLeaves(1, selectedDF)
     noOfLeavesDF
       .take(1)
@@ -240,13 +241,17 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
   test(
     "givenDFAsInputToFindUsersTotalNumberOfLeavesOutputMustNotEqualToExpected"
   ) {
-    val noOfLeavesDF =
-      userlogLateAnalysis.findUsersTotalNumberOfLeaves(1, selectedDF)
     noOfLeavesDF
       .take(1)
       .foreach(row => {
         assert(row.get(0) != null)
-        assert(row.get(1) != 0)
+        assert(row.get(1) != 1)
       })
+  }
+  test("givenWhenWrongDFItShouldTriggerAnException") {
+    val thrown = intercept[Exception] {
+      userlogLateAnalysis.findUsersTotalNumberOfLeaves(1, userlogDF)
+    }
+    assert(thrown.getMessage === "Unable to find users total number of leaves")
   }
 }

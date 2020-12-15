@@ -23,5 +23,13 @@ object UserlogLateAnalysisDriver extends App {
     userlogLateAnalysis.appendActualLoginTimeToDate(loginTimeDF, loginTime)
   appendLoginTimeDF.printSchema()
   appendLoginTimeDF.show()
+  val noOfTimesLateComingDF =
+    userlogLateAnalysis.findLateComing(appendLoginTimeDF)
+  noOfTimesLateComingDF.printSchema()
+  noOfTimesLateComingDF.show()
+  val highestNoOfLateComersDF =
+    userlogLateAnalysis.findHighestNoOfTimeLateComers(noOfTimesLateComingDF)
+  highestNoOfLateComersDF.printSchema()
+  highestNoOfLateComersDF.show(false)
 
 }

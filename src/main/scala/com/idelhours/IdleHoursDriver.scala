@@ -1,22 +1,28 @@
 package com.idelhours
 
 import com.Utility.{UtilityClass, WriteDataToSource}
+import org.apache.spark.sql.DataFrame
 
 /***
   * Driver Class Performs IdleHour Analysis
   */
 object IdleHoursDriver extends App {
-  try {
-    val dbName = System.getenv("DB_NAME")
-    val readTable = System.getenv("TABLE")
-    val username = System.getenv("MYSQL_UN")
-    val password = System.getenv("MYSQL_PW")
-    val url = System.getenv("URL")
-    val tableName = "userlog_idlehours"
-    val xmlFilePath = "./idleHrs/UserIdleHours.xml"
-    val jsonFilePath = "./idleHrs/UserIdleHours.json"
-    val sparkSession = UtilityClass.createSparkSessionObj("IdleHours")
-    val idleHours = new IdleHours(sparkSession)
+  var highToLowIdleHrDF: DataFrame = _
+  val dbName = System.getenv("DB_NAME")
+  val readTable = System.getenv("TABLE")
+  val username = System.getenv("MYSQL_UN")
+  val password = System.getenv("MYSQL_PW")
+  val url = System.getenv("URL")
+  val tableName = "userlog_idlehours"
+  val xmlFilePath = "./idleHrs/UserIdleHours.xml"
+  val jsonFilePath = "./idleHrs/UserIdleHours.json"
+  val sparkSession = UtilityClass.createSparkSessionObj("IdleHours")
+  val idleHours = new IdleHours(sparkSession)
+
+  /***
+    * Finds the Idle hours by calling IdleHours class methods
+    */
+  def findIdleHours(): Unit = {
     val userlogsDF =
       idleHours.readDataFromMySqlForDataFrame(
         dbName,
@@ -37,8 +43,14 @@ object IdleHoursDriver extends App {
     val usersIdleHoursData = idleHours.findIdleHour(groupConcatDF)
     val usersIdleHoursDF = idleHours.createDataFrame(usersIdleHoursData)
     usersIdleHoursDF.show()
-    val highToLowIdleHrDF = idleHours.findHighestIdleHour(usersIdleHoursDF)
+    highToLowIdleHrDF = idleHours.findHighestIdleHour(usersIdleHoursDF)
     highToLowIdleHrDF.show()
+  }
+
+  /***
+    * Writes Data to Source by calling WriteToSource class methods
+   **/
+  def writeDataToSource(): Unit = {
     val mySqlStatus = WriteDataToSource.writeDataFrameToMysql(
       highToLowIdleHrDF,
       dbName,
@@ -68,9 +80,8 @@ object IdleHoursDriver extends App {
     } else {
       println("Unable to write Data into json format")
     }
-    sparkSession.stop()
-  } catch {
-    case ex: Exception =>
-      println(ex.printStackTrace())
   }
+  findIdleHours()
+  writeDataToSource()
+  sparkSession.stop()
 }

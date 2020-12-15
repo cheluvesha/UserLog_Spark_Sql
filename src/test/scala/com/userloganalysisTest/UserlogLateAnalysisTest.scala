@@ -217,4 +217,36 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
         assert(row.getDouble(1) != 0.0)
       })
   }
+  test("givenDFAsInputToFindNoOfWorkingDaysAndOutputMustEqualToExpected") {
+    val noOfWorkingDays = userlogLateAnalysis.findNoOfWorkingDays(selectedDF)
+    assert(noOfWorkingDays === 1)
+  }
+  test("givenDFAsInputToFindNoOfWorkingDaysAndOutputMustNotEqualToExpected") {
+    val noOfWorkingDays = userlogLateAnalysis.findNoOfWorkingDays(selectedDF)
+    assert(noOfWorkingDays != 0)
+  }
+  test(
+    "givenDFAsInputToFindUsersTotalNumberOfLeavesOutputMustEqualToExpected"
+  ) {
+    val noOfLeavesDF =
+      userlogLateAnalysis.findUsersTotalNumberOfLeaves(1, selectedDF)
+    noOfLeavesDF
+      .take(1)
+      .foreach(row => {
+        assert(row.get(0) === "salinabodale73@gmail.com")
+        assert(row.get(1) === 0)
+      })
+  }
+  test(
+    "givenDFAsInputToFindUsersTotalNumberOfLeavesOutputMustNotEqualToExpected"
+  ) {
+    val noOfLeavesDF =
+      userlogLateAnalysis.findUsersTotalNumberOfLeaves(1, selectedDF)
+    noOfLeavesDF
+      .take(1)
+      .foreach(row => {
+        assert(row.get(0) != null)
+        assert(row.get(1) != 0)
+      })
+  }
 }

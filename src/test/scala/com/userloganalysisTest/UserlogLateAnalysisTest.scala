@@ -4,6 +4,7 @@ import java.sql.Timestamp
 
 import com.Utility.UtilityClass
 import com.highestNoOfTimeLateComing.UserlogLateAnalysis
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
@@ -40,6 +41,7 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
   var lateComersDF: DataFrame = _
   var lateHoursDF: DataFrame = _
   var sumLateHourDF: DataFrame = _
+  var noOfLateBroadCast: Broadcast[collection.Map[String, Long]] = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Late Analysis Test")
     userlogLateAnalysis = new UserlogLateAnalysis(spark)
@@ -178,7 +180,7 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
         assert(row.getDouble(1) === 3.0)
       })
   }
-  test("givenDFAsInputToSumLateHoursOfUsersAndOutputMustEqualAsExpected") {
+  test("givenDFAsInputToSumLateHoursOfUsersAndOutputMustNotEqualAsExpected") {
     sumLateHourDF
       .take(1)
       .foreach(row => {
@@ -186,5 +188,33 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
         assert(row.getDouble(1) != 0.0)
       })
   }
+  test("givenDFAsInputToBroadCastAndOutputMustBeEqualToAsExpected") {
+    noOfLateBroadCast =
+      userlogLateAnalysis.broadcastNoOfTimesLateComing(noOfLateComingDF)
+    assert(noOfLateBroadCast.value.getOrElse("xyzname", 0L) === 2)
+  }
+  test("givenDFAsInputToBroadCastAndOutputMustNotEqualToAsExpected") {
 
+    assert(noOfLateBroadCast.value.getOrElse("testname", 0L) != 2)
+  }
+  test("givenDFAsInputToFindAverageLateHoursAndOutputMustBeEqualToExpected") {
+    val averageLateHourDF =
+      userlogLateAnalysis.findAverageLateHours(sumLateHourDF, noOfLateBroadCast)
+    averageLateHourDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) === "xyzname")
+        assert(row.getDouble(1) === 1.5)
+      })
+  }
+  test("givenDFAsInputToFindAverageLateHoursAndOutputMustNotEqualToExpected") {
+    val averageLateHourDF =
+      userlogLateAnalysis.findAverageLateHours(sumLateHourDF, noOfLateBroadCast)
+    averageLateHourDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) != null)
+        assert(row.getDouble(1) != 0.0)
+      })
+  }
 }

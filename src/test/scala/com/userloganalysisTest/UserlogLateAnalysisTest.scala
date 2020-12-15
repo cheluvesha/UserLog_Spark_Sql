@@ -4,7 +4,12 @@ import java.sql.Timestamp
 
 import com.Utility.UtilityClass
 import com.highestNoOfTimeLateComing.UserlogLateAnalysis
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.types.{
+  StringType,
+  StructField,
+  StructType,
+  TimestampType
+}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
@@ -22,18 +27,24 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
   val findLoginTimeData =
     Seq("iamnzm@outlook.com", "2019-09-16", "2019-09-16 13:00:01.0")
   var appendedTimeDF: DataFrame = _
-  val data = Seq(Row("xyzname", "2019-10-12", "2019-10-12 10:30:00"))
+  val data = Seq(
+    Row("xyzname", "2019-10-12 09:00:00", "2019-10-12 10:30:00"),
+    Row("testname", "2019-10-12 09:00:00", "2019-10-12 10:00:00"),
+    Row("xyzname", "2019-10-13 09:00:00", "2019-10-13 10:30:00"),
+    Row("testname", "2019-10-13 09:00:00", "2019-10-13 09:00:00")
+  )
   val schema =
     List(
       StructField("user_name", StringType, nullable = true),
-      StructField("dates", StringType, nullable = true),
+      StructField("entry_time", StringType, nullable = true),
       StructField("users_login_time", StringType, nullable = true)
     )
-  var dfForAppendTest: DataFrame = _
+  var noOfLateComingDF: DataFrame = _
+  var userlogLoginDF: DataFrame = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Late Analysis Test")
     userlogLateAnalysis = new UserlogLateAnalysis(spark)
-    dfForAppendTest = spark.createDataFrame(
+    userlogLoginDF = spark.createDataFrame(
       spark.sparkContext.parallelize(data),
       StructType(schema)
     )
@@ -104,34 +115,43 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
         assert(row.get(2) != null)
       })
   }
-  test(
-    "givenDateStringItMustAppendItToDateColAndOutputShouldBeEqualAsExpected"
-  ) {
-    appendedTimeDF = userlogLateAnalysis.appendActualLoginTimeToDate(
-      dfForAppendTest,
-      "09-00-00"
-    )
-    appendedTimeDF
+  test("givenDFItMustCountNoOfLateComingAndOutputShouldBeAsExpected") {
+    noOfLateComingDF = userlogLateAnalysis.findLateComing(userlogLoginDF)
+    noOfLateComingDF
       .take(1)
       .foreach(row => {
-        assert(row.get(0) === "xyzname")
-        assert(row.get(1) === "2019-10-12 09:00:00")
-        assert(row.get(2) === "2019-10-12 10:30:00")
+        assert(row.getString(0) === "xyzname")
+        assert(row.getLong(1) === 2)
+      })
+  }
+  test("givenDFItMustCountNoOfLateComingAndOutputShouldNotBeAsExpected") {
+    noOfLateComingDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) != "xyzn")
+        assert(row.getLong(1) != 1)
+      })
+  }
+  test("givenWhenDFInputItShouldFindHighestNoOfLateComers") {
+    val lateComersDF =
+      userlogLateAnalysis.findHighestNoOfTimeLateComers(noOfLateComingDF)
+    lateComersDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) === "xyzname")
+        assert(row.getLong(1) === 2)
       })
   }
   test(
-    "givenDateStringItMustAppendItToDateColAndOutputShouldNotBeEqualAsExpected"
+    "givenWhenDFInputItShouldFindHighestNoOfLateComersAndOutputShouldNotEqualToExpected"
   ) {
-    appendedTimeDF = userlogLateAnalysis.appendActualLoginTimeToDate(
-      dfForAppendTest,
-      "09-00-00"
-    )
-    appendedTimeDF
+    val lateComersDF =
+      userlogLateAnalysis.findHighestNoOfTimeLateComers(noOfLateComingDF)
+    lateComersDF
       .take(1)
       .foreach(row => {
-        assert(row.get(0) != null)
-        assert(row.get(1) != null)
-        assert(row.get(2) != null)
+        assert(row.getString(0) != "")
+        assert(row.getLong(1) != 1)
       })
   }
 

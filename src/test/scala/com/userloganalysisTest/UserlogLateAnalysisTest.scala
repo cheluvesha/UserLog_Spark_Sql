@@ -4,12 +4,7 @@ import java.sql.Timestamp
 
 import com.Utility.UtilityClass
 import com.highestNoOfTimeLateComing.UserlogLateAnalysis
-import org.apache.spark.sql.types.{
-  StringType,
-  StructField,
-  StructType,
-  TimestampType
-}
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
@@ -39,8 +34,12 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
       StructField("entry_time", StringType, nullable = true),
       StructField("users_login_time", StringType, nullable = true)
     )
+
   var noOfLateComingDF: DataFrame = _
   var userlogLoginDF: DataFrame = _
+  var lateComersDF: DataFrame = _
+  var lateHoursDF: DataFrame = _
+  var sumLateHourDF: DataFrame = _
   override def beforeAll(): Unit = {
     spark = UtilityClass.createSparkSessionObj("Late Analysis Test")
     userlogLateAnalysis = new UserlogLateAnalysis(spark)
@@ -48,6 +47,7 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
       spark.sparkContext.parallelize(data),
       StructType(schema)
     )
+
   }
 
   test("givenHdfsFilePathItMustReadAndCreateDFAndCountMustGreaterThanZero") {
@@ -133,7 +133,7 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
       })
   }
   test("givenWhenDFInputItShouldFindHighestNoOfLateComers") {
-    val lateComersDF =
+    lateComersDF =
       userlogLateAnalysis.findHighestNoOfTimeLateComers(noOfLateComingDF)
     lateComersDF
       .take(1)
@@ -145,13 +145,45 @@ class UserlogLateAnalysisTest extends FunSuite with BeforeAndAfterAll {
   test(
     "givenWhenDFInputItShouldFindHighestNoOfLateComersAndOutputShouldNotEqualToExpected"
   ) {
-    val lateComersDF =
-      userlogLateAnalysis.findHighestNoOfTimeLateComers(noOfLateComingDF)
     lateComersDF
       .take(1)
       .foreach(row => {
         assert(row.getString(0) != "")
         assert(row.getLong(1) != 1)
+      })
+  }
+  test("givenDFAsInputToFindUsersLateHoursAndOutputMustEqualAsExpected") {
+    lateHoursDF = userlogLateAnalysis.findUsersLateHours(userlogLoginDF)
+    lateHoursDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) === "xyzname")
+        assert(row.getDouble(1) === 1.5)
+      })
+  }
+  test("givenDFAsInputToFindUsersLateHoursAndOutputMustNotEqualAsExpected") {
+    lateHoursDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) != "xyze")
+        assert(row.getDouble(1) != 0.0)
+      })
+  }
+  test("givenDFAsInputToSumLateHoursOfUsersAndOutputMustEqualAsExpected") {
+    sumLateHourDF = userlogLateAnalysis.sumLateHoursForEachUsers(lateHoursDF)
+    sumLateHourDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) === "xyzname")
+        assert(row.getDouble(1) === 3.0)
+      })
+  }
+  test("givenDFAsInputToSumLateHoursOfUsersAndOutputMustEqualAsExpected") {
+    sumLateHourDF
+      .take(1)
+      .foreach(row => {
+        assert(row.getString(0) != "")
+        assert(row.getDouble(1) != 0.0)
       })
   }
 

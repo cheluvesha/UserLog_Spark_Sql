@@ -67,6 +67,13 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
+
+  /**
+    * Appends actual login time to Date column
+    * @param loginTimeDF DataFrame
+    * @param actualLoginTime String
+    * @return DataFrame
+    */
   def appendActualLoginTimeToDate(
       loginTimeDF: DataFrame,
       actualLoginTime: String
@@ -88,23 +95,50 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
+
+  /***
+    * Finds late coming by comparing user login time with actual login time
+    * @param appendTimeDF DataFrame
+    * @return DataFrame
+    */
   def findLateComing(appendTimeDF: DataFrame): DataFrame = {
-    val lateComingDF = appendTimeDF.select(
-      col("*"),
-      expr(
-        "case when users_login_time > entry_time then 1 else 0 end"
-      ) as "count_of_late"
-    )
-    val countLateComingDF = lateComingDF
-      .groupBy("user_name")
-      .agg(sum("count_of_late") as "NoOfTimeLateComing")
-    countLateComingDF
+    try {
+      val lateComingDF = appendTimeDF.select(
+        col("*"),
+        expr(
+          "case when users_login_time > entry_time then 1 else 0 end"
+        ) as "count_of_late"
+      )
+      val countLateComingDF = lateComingDF
+        .groupBy("user_name")
+        .agg(sum("count_of_late") as "NoOfTimeLateComing")
+      countLateComingDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+      case ex: Exception =>
+        throw new Exception("Unable to find login time to create DataFrame")
+    }
   }
+
+  /***
+    * Finds highest number of times late comers by sorting with Descending
+    * @param noOfTimesLateComingDF DataFrame
+    * @return DataFrame
+    */
   def findHighestNoOfTimeLateComers(
       noOfTimesLateComingDF: DataFrame
   ): DataFrame = {
-    val highestNoOfTimeDF =
-      noOfTimesLateComingDF.sort(desc("NoOfTimeLateComing"))
-    highestNoOfTimeDF
+    try {
+      val highestNoOfTimeDF =
+        noOfTimesLateComingDF.sort(desc("NoOfTimeLateComing"))
+      highestNoOfTimeDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+      case ex: Exception =>
+        throw new Exception("Unable to find login time to create DataFrame")
+    }
   }
+
 }

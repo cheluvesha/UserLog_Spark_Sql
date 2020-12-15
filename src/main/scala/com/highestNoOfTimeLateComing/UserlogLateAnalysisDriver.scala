@@ -12,4 +12,10 @@ object UserlogLateAnalysisDriver extends App {
   val userlogsDF = userlogLateAnalysis.readFilesFromHDFS(hdfsFilePath)
   userlogsDF.show()
   userlogsDF.printSchema()
+  val selectedUserlogDF = userlogLateAnalysis.selectRequiredColumn(userlogsDF)
+  selectedUserlogDF.printSchema()
+  selectedUserlogDF.show()
+  val loginTimeDF = userlogLateAnalysis.findLoginTimeForUsers(selectedUserlogDF)
+  loginTimeDF.printSchema()
+  loginTimeDF.show()
 }

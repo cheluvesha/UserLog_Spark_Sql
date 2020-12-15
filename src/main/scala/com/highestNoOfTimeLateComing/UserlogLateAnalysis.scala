@@ -149,11 +149,16 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     }
   }
 
+  /***
+    * finds late hours with respect to each users
+    * @param appendLoginTimeDF DataFrame
+    * @return DataFrame
+    */
   def findUsersLateHours(appendLoginTimeDF: DataFrame): DataFrame = {
     try {
       appendLoginTimeDF.createTempView("user_login_table")
       val usersLateHourDF = sparkSession.sql(
-        """select user_name,case when users_login_time > entry_time then (unix_timestamp(users_login_time)-unix_timestamp(entry_time))/(3600)) else 0.0 end as late_hours from user_login_table"""
+        """select user_name,case when users_login_time > entry_time then (unix_timestamp(users_login_time)-unix_timestamp(entry_time))/(3600) else 0 end as late_hours from user_login_table"""
       )
       usersLateHourDF
     } catch {
@@ -163,15 +168,75 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("Unable to calculate daily hour")
     }
   }
-  def broadcastNoOfTimesLateComing(
-      noOfTimesLateDF: DataFrame
-  ): Broadcast[collection.Map[String, Double]] = {
-    val noOfLateMap =
-      noOfTimesLateDF.rdd
-        .map(users => (users.getString(0), users.getDouble(1)))
-        .collectAsMap()
-    val broadcastNoOfLate = sparkSession.sparkContext.broadcast(noOfLateMap)
-    broadcastNoOfLate
+
+  /***
+    * Sums the each day late hours by group by users
+    * @param usersLateDF DataFrame
+    * @return DataFrame
+    */
+  def sumLateHoursForEachUsers(usersLateDF: DataFrame): DataFrame = {
+    try {
+      val totalLateHoursDF = usersLateDF
+        .groupBy(col("user_name"))
+        .agg(sum("late_hours") as "total_late_hours")
+      totalLateHoursDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+    }
   }
 
+  /***
+    * Creates Broadcast variables for number of late coming data
+    * @param noOfTimesLateDF DataFrame
+    * @return Broadcast[collection.Map[String, Long]]
+    */
+  def broadcastNoOfTimesLateComing(
+      noOfTimesLateDF: DataFrame
+  ): Broadcast[collection.Map[String, Long]] = {
+    try {
+      val noOfLateMap =
+        noOfTimesLateDF.rdd
+          .map(users => (users.getString(0), users.getLong(1)))
+          .collectAsMap()
+      val broadcastNoOfLate = sparkSession.sparkContext.broadcast(noOfLateMap)
+      broadcastNoOfLate
+    } catch {
+      case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("Unable to create broadcast variables")
+    }
+  }
+
+  /***
+    * Finds the average late hour
+    * @param usersTotalLateHourDF DataFrame
+    * @param broadcastNoOfTimesLate Broadcast[collection.Map[String, Long]]
+    * @return DataFrame
+    */
+  def findAverageLateHours(
+      usersTotalLateHourDF: DataFrame,
+      broadcastNoOfTimesLate: Broadcast[collection.Map[String, Long]]
+  ): DataFrame = {
+    try {
+      val spark = sparkSession
+      import spark.sqlContext.implicits._
+      val columns = Seq("username", "average_late_hours")
+      val averageLateHourDF = usersTotalLateHourDF
+        .map(row => {
+          val username = row.getString(0)
+          val lateHours = row.getDouble(1)
+          val noOfLate = broadcastNoOfTimesLate.value.getOrElse(username, 0L)
+          val overAllHours = lateHours / noOfLate
+          val roundedAvgHours = BigDecimal(overAllHours)
+            .setScale(2, BigDecimal.RoundingMode.HALF_UP)
+            .toDouble
+          (username, roundedAvgHours)
+        })
+        .toDF(columns: _*)
+      averageLateHourDF
+    } catch {
+      case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("Unable to find average late hours")
+    }
+  }
 }

@@ -239,4 +239,30 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("Unable to find average late hours")
     }
   }
+  def findNoOfWorkingDays(selectedUserlogDF: DataFrame): Int = {
+    val noOfWorkingDays =
+      selectedUserlogDF.select(countDistinct("dates")).take(1)
+    var days = 0L
+    noOfWorkingDays.foreach(row => days = row.getLong(0))
+    days.toInt
+  }
+  def findUsersTotalNumberOfLeaves(
+      noOfWorkingDays: Int,
+      userlogDF: DataFrame
+  ): DataFrame = {
+    userlogDF.createTempView("userlogs_leaves")
+    val usersTotalNoOfAttendanceDF = sparkSession.sql(
+      "select user_name, count(distinct(dates)) as attendance_count from userlogs_leaves group by user_name"
+    )
+    val addTotalNoWorkingDaysDF =
+      usersTotalNoOfAttendanceDF.select(
+        col("*"),
+        lit(noOfWorkingDays) as "noOfWorkingDays"
+      )
+    val noOfLeavesDF = addTotalNoWorkingDaysDF.select(
+      col("user_name"),
+      (col("noOfWorkingDays") - col("attendance_count")) as "number_of_leaves"
+    )
+    noOfLeavesDF
+  }
 }

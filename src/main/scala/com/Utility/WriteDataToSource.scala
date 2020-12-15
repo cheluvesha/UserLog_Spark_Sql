@@ -32,6 +32,7 @@ object WriteDataToSource {
       writeData.write
         .mode("overwrite")
         .jdbc(System.getenv("URL") + dbName, tableName, prop)
+      sparkSession.catalog.dropTempView("tableToWrite")
       true
     } catch {
       case nullPointerException: NullPointerException =>

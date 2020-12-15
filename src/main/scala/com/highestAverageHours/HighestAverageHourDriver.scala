@@ -1,26 +1,32 @@
 package com.highestAverageHours
 
 import com.Utility.{UtilityClass, WriteDataToSource}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /***
   * Driver Class calls respective functions to perform analysis and computation on userlogs
   */
 object HighestAverageHourDriver extends App {
-  try {
-    val dbName = System.getenv("DB_NAME")
-    val readTable = System.getenv("TABLE")
-    val username = System.getenv("MYSQL_UN")
-    val password = System.getenv("MYSQL_PW")
-    val url = System.getenv("URL")
-    val tableName = "userlog_HighAvgHours"
-    val xmlFilePath = "./HighHrs/UserAvgHighHours.xml"
-    val jsonFilePath = "./HighHrs/UserAvgHighHours.json"
-    val idleHoursTable = "userlog_idlehours"
-    val days = 6
-    val sparkSession: SparkSession =
-      UtilityClass.createSparkSessionObj("HighestAverageHours")
-    val highestAverageHour = new HighestAverageHour(sparkSession)
+
+  val dbName = System.getenv("DB_NAME")
+  val readTable = System.getenv("TABLE")
+  val username = System.getenv("MYSQL_UN")
+  val password = System.getenv("MYSQL_PW")
+  val url = System.getenv("URL")
+  val tableName = "userlog_HighAvgHours"
+  val xmlFilePath = "./HighHrs/UserAvgHighHours.xml"
+  val jsonFilePath = "./HighHrs/UserAvgHighHours.json"
+  val idleHoursTable = "userlog_idlehours"
+  val days = 6
+  val sparkSession: SparkSession =
+    UtilityClass.createSparkSessionObj("HighestAverageHours")
+  val highestAverageHour = new HighestAverageHour(sparkSession)
+  var highestAverageHourDF: DataFrame = _
+
+  /***
+    * Calls HighestAverageHour class methods to find highest average hours
+    */
+  def findHighestAverageHour(): Unit = {
     val userlogsDataFrame = highestAverageHour.readDataFromMySqlForDataFrame(
       dbName,
       readTable,
@@ -60,9 +66,15 @@ object HighestAverageHourDriver extends App {
         days
       )
     overAllAverageHourDF.show()
-    val highestAverageHourDF =
+    highestAverageHourDF =
       highestAverageHour.sortByHighestAverageHours(overAllAverageHourDF)
     highestAverageHourDF.show()
+  }
+
+  /***
+    * Calls WriteDataToSource class methods to write data into files
+    */
+  def writeDataToSource(): Unit = {
     val mySqlStatus = WriteDataToSource.writeDataFrameToMysql(
       highestAverageHourDF,
       dbName,
@@ -92,9 +104,8 @@ object HighestAverageHourDriver extends App {
     } else {
       println("Unable to write Data into json format")
     }
-    sparkSession.stop()
-  } catch {
-    case ex: Exception =>
-      println(ex.printStackTrace())
   }
+  findHighestAverageHour()
+  writeDataToSource()
+  sparkSession.stop()
 }

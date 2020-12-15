@@ -4,7 +4,6 @@ import java.sql.Timestamp
 import com.Utility.UtilityClass
 import com.idelhours.IdleHours
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scala.collection.mutable
 

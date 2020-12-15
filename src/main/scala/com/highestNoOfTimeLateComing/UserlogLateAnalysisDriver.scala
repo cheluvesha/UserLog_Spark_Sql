@@ -1,20 +1,24 @@
 package com.highestNoOfTimeLateComing
 
 import com.Utility.{UtilityClass, WriteDataToSource}
+import org.apache.spark.sql.DataFrame
 
 /***
   * Driver class performs function class to perform late analysis on userlog
   */
 object UserlogLateAnalysisDriver extends App {
-  try {
-    val hdfsFilePath = System.getenv("hdfsFilePath")
-    val dbName = System.getenv("DB_NAME")
-    val tableName = "userlog_lateComers"
-    val xmlFilePath = "./late/lateComers.xml"
-    val jsonFilePath = "./late/lateComers.json"
-    val sparkSession = UtilityClass.createSparkSessionObj("UserlogLateAnalysis")
-    val loginTime = "09:00:00"
-    val userlogLateAnalysis = new UserlogLateAnalysis(sparkSession)
+  val hdfsFilePath = System.getenv("hdfsFilePath")
+  val dbName = System.getenv("DB_NAME")
+  val tableName = "userlog_lateComers"
+  val xmlFilePath = "./late/lateComers.xml"
+  val jsonFilePath = "./late/lateComers.json"
+  val sparkSession = UtilityClass.createSparkSessionObj("UserlogLateAnalysis")
+  val loginTime = "09:00:00"
+  val userlogLateAnalysis = new UserlogLateAnalysis(sparkSession)
+  var appendLoginTimeDF: DataFrame = _
+  var noOfTimesLateComingDF: DataFrame = _
+  var highestNoOfLateComersDF: DataFrame = _
+  def findNoOfLateComing(): Unit = {
     val userlogsDF = userlogLateAnalysis.readFilesFromHDFS(hdfsFilePath)
     userlogsDF.show()
     userlogsDF.printSchema()
@@ -25,18 +29,39 @@ object UserlogLateAnalysisDriver extends App {
       userlogLateAnalysis.findLoginTimeForUsers(selectedUserlogDF)
     loginTimeDF.printSchema()
     loginTimeDF.show()
-    val appendLoginTimeDF =
+    appendLoginTimeDF =
       userlogLateAnalysis.appendActualLoginTimeToDate(loginTimeDF, loginTime)
     appendLoginTimeDF.printSchema()
     appendLoginTimeDF.show()
-    val noOfTimesLateComingDF =
+    noOfTimesLateComingDF =
       userlogLateAnalysis.findLateComing(appendLoginTimeDF)
     noOfTimesLateComingDF.printSchema()
     noOfTimesLateComingDF.show()
-    val highestNoOfLateComersDF =
+    highestNoOfLateComersDF =
       userlogLateAnalysis.findHighestNoOfTimeLateComers(noOfTimesLateComingDF)
     highestNoOfLateComersDF.printSchema()
     highestNoOfLateComersDF.show(false)
+  }
+  def findAverageLateHours(): Unit = {
+    val usersLateHourDF =
+      userlogLateAnalysis.findUsersLateHours(appendLoginTimeDF)
+    usersLateHourDF.show()
+    usersLateHourDF.printSchema()
+    val totalLateHoursDF =
+      userlogLateAnalysis.sumLateHoursForEachUsers(usersLateHourDF)
+    totalLateHoursDF.show()
+    totalLateHoursDF.printSchema()
+    val broadcastNoOfTimesLate =
+      userlogLateAnalysis.broadcastNoOfTimesLateComing(noOfTimesLateComingDF)
+    val averageLateHoursDF =
+      userlogLateAnalysis.findAverageLateHours(
+        totalLateHoursDF,
+        broadcastNoOfTimesLate
+      )
+    averageLateHoursDF.printSchema()
+    averageLateHoursDF.show()
+  }
+  def writeHighestNoOfLateComingDataToSources(): Unit = {
     val mySqlStatus = WriteDataToSource.writeDataFrameToMysql(
       highestNoOfLateComersDF,
       dbName,
@@ -66,8 +91,5 @@ object UserlogLateAnalysisDriver extends App {
     } else {
       println("Unable to write Data into json format")
     }
-  } catch {
-    case ex: Exception =>
-      println(ex.printStackTrace())
   }
 }

@@ -1,13 +1,6 @@
 package com.highestNoOfTimeLateComing
 
-import org.apache.spark.sql.functions.{
-  col,
-  concat,
-  lit,
-  min,
-  to_date,
-  to_timestamp
-}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /***
@@ -78,14 +71,40 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       loginTimeDF: DataFrame,
       actualLoginTime: String
   ): DataFrame = {
-    val actualTimeDF =
-      loginTimeDF.withColumn("actual_login_time", lit(" " + actualLoginTime))
-    val appendTimeDF = actualTimeDF.select(
-      col("user_name"),
-      (concat(col("dates"), col("actual_login_time")) as "entry_time")
-        .cast("timestamp"),
-      col("users_login_time")
+    try {
+      val actualTimeDF =
+        loginTimeDF.withColumn("actual_login_time", lit(" " + actualLoginTime))
+      val appendTimeDF = actualTimeDF.select(
+        col("user_name"),
+        (concat(col("dates"), col("actual_login_time")) as "entry_time")
+          .cast("timestamp"),
+        col("users_login_time")
+      )
+      appendTimeDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+      case ex: Exception =>
+        throw new Exception("Unable to find login time to create DataFrame")
+    }
+  }
+  def findLateComing(appendTimeDF: DataFrame): DataFrame = {
+    val lateComingDF = appendTimeDF.select(
+      col("*"),
+      expr(
+        "case when users_login_time > entry_time then 1 else 0 end"
+      ) as "count_of_late"
     )
-    appendTimeDF
+    val countLateComingDF = lateComingDF
+      .groupBy("user_name")
+      .agg(sum("count_of_late") as "NoOfTimeLateComing")
+    countLateComingDF
+  }
+  def findHighestNoOfTimeLateComers(
+      noOfTimesLateComingDF: DataFrame
+  ): DataFrame = {
+    val highestNoOfTimeDF =
+      noOfTimesLateComingDF.sort(desc("NoOfTimeLateComing"))
+    highestNoOfTimeDF
   }
 }

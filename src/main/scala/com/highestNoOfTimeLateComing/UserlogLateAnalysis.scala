@@ -1,6 +1,13 @@
 package com.highestNoOfTimeLateComing
 
-import org.apache.spark.sql.functions.{col, min, to_date}
+import org.apache.spark.sql.functions.{
+  col,
+  concat,
+  lit,
+  min,
+  to_date,
+  to_timestamp
+}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /***
@@ -11,6 +18,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
 
   /***
     * Reads data from hdfs to create DataFrame
+    *
     * @param hdfsFilePath String
     * @return DataFrame
     */
@@ -57,7 +65,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     try {
       val loginTimeDF = userLogsDataFrame
         .groupBy("user_name", "dates")
-        .agg(min("Datetime") as "login_time")
+        .agg(min("Datetime") as "users_login_time")
       loginTimeDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
@@ -66,5 +74,18 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
-
+  def appendActualLoginTimeToDate(
+      loginTimeDF: DataFrame,
+      actualLoginTime: String
+  ): DataFrame = {
+    val actualTimeDF =
+      loginTimeDF.withColumn("actual_login_time", lit(" " + actualLoginTime))
+    val appendTimeDF = actualTimeDF.select(
+      col("user_name"),
+      (concat(col("dates"), col("actual_login_time")) as "entry_time")
+        .cast("timestamp"),
+      col("users_login_time")
+    )
+    appendTimeDF
+  }
 }

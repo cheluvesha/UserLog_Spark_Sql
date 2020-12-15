@@ -55,7 +55,6 @@ class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
     val spark1 = spark
     import spark1.implicits._
     userlogReadTestDF = data.toDF(column: _*)
-    userlogReadTestDF.withColumn("datetime", to_timestamp(col("datetime")))
   }
 
   test("givenDataToConnectMysqlToCheckDataBaseConnection") {

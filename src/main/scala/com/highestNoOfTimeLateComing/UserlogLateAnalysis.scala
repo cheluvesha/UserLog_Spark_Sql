@@ -163,5 +163,15 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("Unable to calculate daily hour")
     }
   }
+  def broadcastNoOfTimesLateComing(
+      noOfTimesLateDF: DataFrame
+  ): Broadcast[collection.Map[String, Double]] = {
+    val noOfLateMap =
+      noOfTimesLateDF.rdd
+        .map(users => (users.getString(0), users.getDouble(1)))
+        .collectAsMap()
+    val broadcastNoOfLate = sparkSession.sparkContext.broadcast(noOfLateMap)
+    broadcastNoOfLate
+  }
 
 }

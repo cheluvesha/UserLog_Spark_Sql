@@ -1,5 +1,6 @@
 package com.highestNoOfTimeLateComing
 
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -9,7 +10,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
   */
 class UserlogLateAnalysis(sparkSession: SparkSession) {
 
-  /***
+  sparkSession.sparkContext.setLogLevel("OFF")
+
+  /** *
     * Reads data from hdfs to create DataFrame
     *
     * @param hdfsFilePath String
@@ -28,19 +31,20 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     }
   }
 
-  /***
+  /** *
     * Selects the required rows from the DataFrame
+    *
     * @param userlogsDF DataFrame
     * @return DataFrame
     */
   def selectRequiredColumn(userlogsDF: DataFrame): DataFrame = {
     try {
-      val selectedDF = userlogsDF.select(
+      val selectedColDF = userlogsDF.select(
         col("Datetime"),
         to_date(col("Datetime"), "yyyy-MM-dd") as "dates",
         col("user_name")
       )
-      selectedDF
+      selectedColDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
         throw new Exception("SQL Syntax Error Please Check The Syntax")
@@ -49,14 +53,15 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     }
   }
 
-  /***
-    * finds minimum time i.e Login time through Group by and creates loginTimeDF DataFrame
-    * @param userLogsDataFrame DataFrame
+  /** *
+    * finds minimum time i.e Login time through Group by and creates loginTimeDF as DataFrame
+    *
+    * @param selectedColDF DataFrame
     * @return DataFrame
     */
-  def findLoginTimeForUsers(userLogsDataFrame: DataFrame): DataFrame = {
+  def findLoginTimeForUsers(selectedColDF: DataFrame): DataFrame = {
     try {
-      val loginTimeDF = userLogsDataFrame
+      val loginTimeDF = selectedColDF
         .groupBy("user_name", "dates")
         .agg(min("Datetime") as "users_login_time")
       loginTimeDF
@@ -70,7 +75,8 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
 
   /**
     * Appends actual login time to Date column
-    * @param loginTimeDF DataFrame
+    *
+    * @param loginTimeDF     DataFrame
     * @param actualLoginTime String
     * @return DataFrame
     */
@@ -96,8 +102,9 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     }
   }
 
-  /***
+  /** *
     * Finds late coming by comparing user login time with actual login time
+    *
     * @param appendTimeDF DataFrame
     * @return DataFrame
     */
@@ -121,8 +128,9 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     }
   }
 
-  /***
+  /** *
     * Finds highest number of times late comers by sorting with Descending
+    *
     * @param noOfTimesLateComingDF DataFrame
     * @return DataFrame
     */
@@ -138,6 +146,21 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
         throw new Exception("Unable to find login time to create DataFrame")
+    }
+  }
+
+  def findUsersLateHours(appendLoginTimeDF: DataFrame): DataFrame = {
+    try {
+      appendLoginTimeDF.createTempView("user_login_table")
+      val usersLateHourDF = sparkSession.sql(
+        """select user_name,case when users_login_time > entry_time then (unix_timestamp(users_login_time)-unix_timestamp(entry_time))/(3600)) else 0.0 end as late_hours from user_login_table"""
+      )
+      usersLateHourDF
+    } catch {
+      case sqlException: org.apache.spark.sql.AnalysisException =>
+        throw new Exception("SQL Syntax Error Please Check The Syntax")
+      case ex: Exception =>
+        throw new Exception("Unable to calculate daily hour")
     }
   }
 

@@ -1,26 +1,31 @@
 package com.lowestAverageHours
 
 import com.Utility.{UtilityClass, WriteDataToSource}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /***
   * Driver Class calls respective functions to perform analysis and computation on userlogs
   */
 object LowestAverageHourDriver extends App {
-  try {
-    val dbName = System.getenv("DB_NAME")
-    val readTable = System.getenv("TABLE")
-    val username = System.getenv("MYSQL_UN")
-    val password = System.getenv("MYSQL_PW")
-    val url = System.getenv("URL")
-    val tableName = "userlog_LowestAvgHours"
-    val xmlFilePath = "./LowAVGHrs/UserAvgLowestHours.xml"
-    val jsonFilePath = "./LowAVGHrs/UserAvgLowestHours.json"
-    val idleHoursTable = "userlog_idlehours"
-    val days = 6
-    val sparkSession: SparkSession =
-      UtilityClass.createSparkSessionObj("AverageLowestHours")
-    val lowestAverageHour = new LowestAverageHour(sparkSession)
+  val dbName = System.getenv("DB_NAME")
+  val readTable = System.getenv("TABLE")
+  val username = System.getenv("MYSQL_UN")
+  val password = System.getenv("MYSQL_PW")
+  val url = System.getenv("URL")
+  val tableName = "userlog_LowestAvgHours"
+  val xmlFilePath = "./LowAVGHrs/UserAvgLowestHours.xml"
+  val jsonFilePath = "./LowAVGHrs/UserAvgLowestHours.json"
+  val idleHoursTable = "userlog_idlehours"
+  val days = 6
+  var lowestAverageHourDF: DataFrame = _
+  val sparkSession: SparkSession =
+    UtilityClass.createSparkSessionObj("AverageLowestHours")
+  val lowestAverageHour = new LowestAverageHour(sparkSession)
+
+  /***
+    * Finds the Lowest Average Hour by calling LowestAverageHour class methods
+    */
+  def findLowestAverageHour(): Unit = {
     val userlogsDataFrame = lowestAverageHour.readDataFromMySqlForDataFrame(
       dbName,
       readTable,
@@ -60,9 +65,15 @@ object LowestAverageHourDriver extends App {
         days
       )
     overAllAverageHourDF.show()
-    val lowestAverageHourDF =
+    lowestAverageHourDF =
       lowestAverageHour.sortByLowestAverageHours(overAllAverageHourDF)
     lowestAverageHourDF.show()
+  }
+
+  /***
+    * Calls WriteDataToSource class methods to write data into files
+    */
+  def writeDataToSource(): Unit = {
     val mySqlStatus = WriteDataToSource.writeDataFrameToMysql(
       lowestAverageHourDF,
       dbName,
@@ -92,9 +103,8 @@ object LowestAverageHourDriver extends App {
     } else {
       println("Unable to write Data into json format")
     }
-    sparkSession.stop()
-  } catch {
-    case ex: Exception =>
-      println(ex.printStackTrace())
   }
+  findLowestAverageHour()
+  writeDataToSource()
+  sparkSession.stop()
 }

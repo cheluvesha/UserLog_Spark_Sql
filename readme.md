@@ -1,13 +1,13 @@
-##Project Title: Userlogs Late Coming Analysis
+# Project Title: Userlogs Late Coming Analysis
 Reads userlogs data from Mysql table in order to perform ETL by using Spark core and Spark Sql Api 
 
 
-##Project Description
+# Project Description
 Extracts required fields to find users the number of times late coming, 
 average late coming hours and total number of leaves, 
 and writes processed data into mysql table, json and Xml files
 
-##Dependencies Used
+# Dependencies Used
 ### Spark Core Api 
 Execution Engine
 ### Spark Sql Api
@@ -19,7 +19,7 @@ Used for the purpose of testing the code
 ### Spark-XML Api From DataBricks
 Enables support for writing data to xml format
 
-##Plugins Used
+# Plugins Used
 ### ScapeGoat
 Scala static code analyzer and tool that flag suspicious language usage in code
 ### SCoverage
@@ -28,7 +28,7 @@ directories and source code files to see uncovered statements
 ### ScalaFmt
 it enables code format support
 
-##Build Tool Details
+# Build Tool Details
 ### Scala Version - 2.12.10
 ### Spark Core - 2.4.1
 ### Spark Sql - 2.4.1

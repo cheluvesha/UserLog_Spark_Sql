@@ -14,8 +14,6 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.1"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % Test
 
-// https://mvnrepository.com/artifact/mysql/mysql-connector-java
 libraryDependencies += "mysql" % "mysql-connector-java" % "8.0.21"
 
-// https://mvnrepository.com/artifact/com.databricks/spark-xml
 libraryDependencies += "com.databricks" %% "spark-xml" % "0.11.0"

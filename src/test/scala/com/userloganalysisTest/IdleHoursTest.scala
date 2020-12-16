@@ -8,6 +8,9 @@ import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scala.collection.mutable
 
+/***
+  * Test class for IdleHours
+  */
 class IdleHoursTest extends FunSuite with BeforeAndAfterAll {
   var spark: SparkSession = _
   var idleHours: IdleHours = _

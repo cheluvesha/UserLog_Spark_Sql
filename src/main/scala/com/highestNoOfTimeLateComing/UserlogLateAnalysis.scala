@@ -89,7 +89,10 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
         loginTimeDF.withColumn("actual_login_time", lit(" " + actualLoginTime))
       val appendTimeDF = actualTimeDF.select(
         col("user_name"),
-        (concat(col("dates"), col("actual_login_time")) as "entry_time")
+        (concat(
+          col("dates"),
+          col("actual_login_time")
+        ) as "entry_time")
           .cast("timestamp"),
         col("users_login_time")
       )
@@ -242,13 +245,13 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
 
   /***
     * finds the total number of working days
-    * @param selectedUserlogDF DataFrame
+    * @param selectedColUserlogDF DataFrame
     * @return Int
     */
-  def findNoOfWorkingDays(selectedUserlogDF: DataFrame): Int = {
+  def findNoOfWorkingDays(selectedColUserlogDF: DataFrame): Int = {
     try {
       val noOfWorkingDays =
-        selectedUserlogDF.select(countDistinct("dates")).take(1)
+        selectedColUserlogDF.select(countDistinct("dates")).take(1)
       var days = 0L
       noOfWorkingDays.foreach(row => days = row.getLong(0))
       days.toInt

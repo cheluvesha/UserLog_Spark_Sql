@@ -9,6 +9,9 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scala.collection.mutable
 
+/***
+  * Test class for HighestAverageHour
+  */
 class HighestAverageHourTest extends FunSuite with BeforeAndAfterAll {
   var spark: SparkSession = _
   val dbName: String = System.getenv("DB_NAME")

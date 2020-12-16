@@ -1,7 +1,6 @@
 package com.userloganalysisTest
 
 import java.sql.Timestamp
-
 import com.Utility.UtilityClass
 import com.lowestAverageHours.LowestAverageHour
 import org.apache.spark.broadcast.Broadcast
@@ -10,6 +9,9 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scala.collection.mutable
 
+/***
+  * Test Class for LowestAverageHour
+  */
 class LowestAverageHourTest extends FunSuite with BeforeAndAfterAll {
   var spark: SparkSession = _
   val dbName: String = System.getenv("DB_NAME")

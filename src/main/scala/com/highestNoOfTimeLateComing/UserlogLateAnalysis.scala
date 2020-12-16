@@ -1,5 +1,6 @@
 package com.highestNoOfTimeLateComing
 
+import org.apache.log4j.Logger
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -10,7 +11,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
   */
 class UserlogLateAnalysis(sparkSession: SparkSession) {
 
-  sparkSession.sparkContext.setLogLevel("OFF")
+  lazy val logger: Logger = Logger.getLogger(getClass.getName)
 
   /** *
     * Reads data from hdfs to create DataFrame
@@ -19,6 +20,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def readFilesFromHDFS(hdfsFilePath: String): DataFrame = {
+    logger.info("Read operation started to create dataframe from mysql")
     try {
       val userlogsDF = sparkSession.read
         .option("inferSchema", value = true)
@@ -27,6 +29,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       userlogsDF
     } catch {
       case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlAnalysisException.printStackTrace())
         throw new Exception("Please Check The Path Specified")
     }
   }
@@ -38,6 +41,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def selectRequiredColumn(userlogsDF: DataFrame): DataFrame = {
+    logger.info("Executing selectRequiredColumn")
     try {
       val selectedColDF = userlogsDF.select(
         col("Datetime"),
@@ -47,8 +51,10 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       selectedColDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
+        logger.error(ex.printStackTrace())
         throw new Exception("Unable to split and create userlog dataframe")
     }
   }
@@ -60,6 +66,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def findLoginTimeForUsers(selectedColDF: DataFrame): DataFrame = {
+    logger.info("Executing findLoginTimeForUsers")
     try {
       val loginTimeDF = selectedColDF
         .groupBy("user_name", "dates")
@@ -67,8 +74,10 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       loginTimeDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
+        logger.error(ex.printStackTrace())
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
@@ -84,6 +93,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       loginTimeDF: DataFrame,
       actualLoginTime: String
   ): DataFrame = {
+    logger.info("Executing appendActualLoginTimeToDate")
     try {
       val actualTimeDF =
         loginTimeDF.withColumn("actual_login_time", lit(" " + actualLoginTime))
@@ -99,8 +109,10 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       appendTimeDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
+        logger.error(ex.printStackTrace())
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
@@ -112,6 +124,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def findLateComing(appendTimeDF: DataFrame): DataFrame = {
+    logger.info("Executing findLateComing")
     try {
       val lateComingDF = appendTimeDF.select(
         col("*"),
@@ -125,8 +138,10 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       countLateComingDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
+        logger.error(ex.printStackTrace())
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
@@ -140,14 +155,17 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
   def findHighestNoOfTimeLateComers(
       noOfTimesLateComingDF: DataFrame
   ): DataFrame = {
+    logger.info("Executing findHighestNoOfTimeLateComers")
     try {
       val highestNoOfTimeDF =
         noOfTimesLateComingDF.sort(desc("NoOfTimeLateComing"))
       highestNoOfTimeDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
+        logger.error(ex.printStackTrace())
         throw new Exception("Unable to find login time to create DataFrame")
     }
   }
@@ -158,6 +176,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def findUsersLateHours(appendLoginTimeDF: DataFrame): DataFrame = {
+    logger.info("Executing findUsersLateHours")
     try {
       appendLoginTimeDF.createTempView("user_login_table")
       val usersLateHourDF = sparkSession.sql(
@@ -166,8 +185,10 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       usersLateHourDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
       case ex: Exception =>
+        logger.error(ex.printStackTrace())
         throw new Exception("Unable to calculate daily hour")
     }
   }
@@ -178,6 +199,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return DataFrame
     */
   def sumLateHoursForEachUsers(usersLateDF: DataFrame): DataFrame = {
+    logger.info("Executing sumLateHoursForEachUsers")
     try {
       val totalLateHoursDF = usersLateDF
         .groupBy(col("user_name"))
@@ -185,6 +207,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       totalLateHoursDF
     } catch {
       case sqlException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlException.printStackTrace())
         throw new Exception("SQL Syntax Error Please Check The Syntax")
     }
   }
@@ -197,6 +220,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
   def broadcastNoOfTimesLateComing(
       noOfTimesLateDF: DataFrame
   ): Broadcast[collection.Map[String, Long]] = {
+    logger.info("Executing broadcastNoOfTimesLateComing")
     try {
       val noOfLateMap =
         noOfTimesLateDF.rdd
@@ -206,6 +230,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       broadcastNoOfLate
     } catch {
       case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlAnalysisException.printStackTrace())
         throw new Exception("Unable to create broadcast variables")
     }
   }
@@ -220,6 +245,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       usersTotalLateHourDF: DataFrame,
       broadcastNoOfTimesLate: Broadcast[collection.Map[String, Long]]
   ): DataFrame = {
+    logger.info("Executing findAverageLateHours")
     try {
       val spark = sparkSession
       import spark.sqlContext.implicits._
@@ -239,6 +265,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       averageLateHourDF
     } catch {
       case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlAnalysisException.printStackTrace())
         throw new Exception("Unable to find average late hours")
     }
   }
@@ -249,6 +276,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
     * @return Int
     */
   def findNoOfWorkingDays(selectedColUserlogDF: DataFrame): Int = {
+    logger.info("Executing findNoOfWorkingDays")
     try {
       val noOfWorkingDays =
         selectedColUserlogDF.select(countDistinct("dates")).take(1)
@@ -257,6 +285,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       days.toInt
     } catch {
       case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlAnalysisException.printStackTrace())
         throw new Exception("Unable to find number of working days")
     }
   }
@@ -271,6 +300,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       noOfWorkingDays: Int,
       userlogDF: DataFrame
   ): DataFrame = {
+    logger.info("Executing findUsersTotalNumberOfLeaves")
     try {
       userlogDF.createTempView("userlogs_leaves")
       val usersTotalNoOfAttendanceDF = sparkSession.sql(
@@ -288,6 +318,7 @@ class UserlogLateAnalysis(sparkSession: SparkSession) {
       noOfLeavesDF
     } catch {
       case sqlAnalysisException: org.apache.spark.sql.AnalysisException =>
+        logger.error(sqlAnalysisException.printStackTrace())
         throw new Exception("Unable to find users total number of leaves")
     }
   }
